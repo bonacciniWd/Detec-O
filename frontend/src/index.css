@@ -1,0 +1,176 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* Variáveis globais para acessibilidade */
+:root {
+  --font-size-multiplier: 1;
+  --reduce-motion: 0;
+}
+
+/* Estilo básico global para tema escuro */
+body {
+  @apply bg-gray-900 text-gray-100;
+  font-size: calc(16px * var(--font-size-multiplier));
+}
+
+/* Estilos para acessibilidade */
+html, body {
+  scroll-behavior: smooth;
+}
+
+/* Melhorar visibilidade de foco para todos os elementos interativos */
+a:focus,
+button:focus,
+input:focus,
+select:focus,
+textarea:focus {
+  @apply outline-none ring-2 ring-blue-500 ring-opacity-50;
+}
+
+/* Alta visibilidade para estado de foco quando a opção estiver ativada */
+body.focus-highlight *:focus {
+  outline: 3px solid #4299e1 !important;
+  outline-offset: 2px !important;
+}
+
+/* Controle de movimento para acessibilidade */
+@media (prefers-reduced-motion: reduce), (--reduce-motion: 1) {
+  *,
+  ::before,
+  ::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}
+
+/* Alto contraste */
+body.high-contrast {
+  filter: contrast(1.4);
+}
+
+/* Cores invertidas */
+body.inverted-colors {
+  filter: invert(1) hue-rotate(180deg);
+}
+/* Imagens não devem ser invertidas quando o modo invertido estiver ativo */
+body.inverted-colors img,
+body.inverted-colors video {
+  filter: invert(1) hue-rotate(180deg);
+}
+
+/* Modo monocromático */
+body.monochrome {
+  filter: grayscale(1);
+}
+
+/* Classes ARIA para acessibilidade */
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border-width: 0;
+}
+
+/* Transições suaves por padrão, mas respeitando preferências de movimento reduzido */
+.transition-all {
+  transition-property: all;
+  transition-timing-function: cubic-bezier(0.4, 0, 0.2, 1);
+  transition-duration: 150ms;
+}
+
+@media (prefers-reduced-motion: reduce), (--reduce-motion: 1) {
+  .transition-all {
+    transition-duration: 0.01ms !important;
+  }
+}
+
+/* Animação de pulsação para carregamento */
+@keyframes pulse {
+  0%, 100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.5;
+  }
+}
+
+.animate-pulse {
+  animation: pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+}
+
+@media (prefers-reduced-motion: reduce), (--reduce-motion: 1) {
+  .animate-pulse {
+    animation: none !important;
+  }
+}
+
+/* Melhor legibilidade para textos pequenos */
+.text-xs, .text-sm {
+  line-height: 1.5;
+}
+
+/* Melhorar contraste para botões desabilitados */
+button:disabled, 
+.disabled {
+  @apply opacity-70 !important;
+}
+
+/* Estilos para foco de toque em dispositivos móveis */
+@media (hover: none) {
+  a:active,
+  button:active {
+    @apply bg-opacity-90;
+  }
+}
+
+/* Tamanho de ícones SVG consistente para melhor legibilidade */
+svg {
+  display: inline-block;
+  vertical-align: middle;
+}
+
+/* Prevenir overflow de texto */
+.truncate {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* Melhor visualização de tabelas em dispositivos móveis */
+.table-responsive {
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+}
+
+/* Espaçamento de parágrafos consistente */
+p {
+  margin-bottom: 1em;
+}
+
+/* Garantir bom contraste para textos na interface */
+.text-gray-400 {
+  @apply text-gray-300;
+}
+
+/* Melhoria de legibilidade para botões */
+button, 
+.btn {
+  @apply font-medium py-2 px-4 rounded;
+}
+
+/* Utilitários para largura e altura de conteúdo */
+.w-content {
+  width: fit-content;
+}
+
+.h-content {
+  height: fit-content;
+}

@@ -1,0 +1,68 @@
+{
+    "app_name": "Sistema de Detecção de Crimes",
+    "version": "1.0.0",
+    "api_version": "v1",
+    "db_name": "crime_detection_system",
+    "mongo_uri": "mongodb://localhost:27017",
+    "cameras": [
+        {
+            "id": "cam1",
+            "url": 0,
+            "location": "Webcam Principal",
+            "enabled": true
+        },
+        {
+            "id": "camera1",
+            "url": "rtsp://admin:admin@192.168.0.100:554/cam/realmonitor?channel=1&subtype=0",
+            "location": "Entrada Principal",
+            "enabled": false
+        },
+        {
+            "id": "camera2",
+            "url": "rtsp://admin:admin@192.168.0.101:554/cam/realmonitor?channel=1&subtype=0",
+            "location": "Estacionamento",
+            "enabled": false
+        }
+    ],
+    "detection": {
+        "confidence_threshold": 0.4,
+        "detect_weapons": true,
+        "detect_faces": true,
+        "analyze_behavior": true,
+        "target_classes": [
+            "person",
+            "knife",
+            "scissors",
+            "gun",
+            "pistol",
+            "rifle"
+        ],
+        "frame_interval": 5,
+        "suspicious_behavior": {
+            "long_stay_threshold": 300,
+            "hand_movement_sensitivity": 3
+        }
+    },
+    "api": {
+        "port": 8000,
+        "jwt_secret": "seu_segredo_super_secreto",
+        "jwt_expires": 3600
+    },
+    "notification": {
+        "email_enabled": false,
+        "email_server": "",
+        "email_user": "",
+        "email_password": "",
+        "email_recipients": [],
+        "sms": {
+            "enabled": false,
+            "api_key": "",
+            "phone_numbers": ["+5511999999999"]
+        }
+    },
+    "auth": {
+        "token_expire_minutes": 60,
+        "secret_key": "your-secret-key-here",
+        "algorithm": "HS256"
+    }
+} 
