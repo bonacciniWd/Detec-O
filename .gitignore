@@ -1,7 +1,6 @@
-node_modules
-venv
+node_modules/
 venv/
-*.pyd
-*.lib
-*.dll
-*.dat
+__pycache__/
+*.pyc
+*.pyo
+.DS_Store
