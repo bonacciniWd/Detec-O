@@ -34,37 +34,34 @@ const AddCameraPage = () => {
     setError(null);
     
     try {
-      // A implementação real dependeria da API backend
-      // Simulação para exemplo:
-      setTimeout(() => {
-        setDiscoveredCameras([
-          {
-            name: 'Câmera Hikvision',
-            ip_address: '192.168.1.101',
-            rtsp_url: 'rtsp://192.168.1.101:554/Streaming/Channels/101',
-            manufacturer: 'Hikvision',
-            model: 'DS-2CD2143G0-I'
-          },
-          {
-            name: 'Câmera Dahua',
-            ip_address: '192.168.1.102',
-            rtsp_url: 'rtsp://192.168.1.102:554/cam/realmonitor',
-            manufacturer: 'Dahua',
-            model: 'IPC-HDW1230S'
-          }
-        ]);
-        setIsDiscovering(false);
-      }, 2000);
+      // Chamar a API real de descoberta de câmeras
+      const response = await axios.post('/api/devices/discover', 
+        { 
+          discovery_methods: ["auto"],
+          timeout: 10.0
+        }, 
+        {
+          headers: { 'Authorization': `Bearer ${token}` }
+        }
+      );
       
-      // Implementação real seria algo como:
-      // const response = await axios.get('/api/discover-cameras', {
-      //   headers: { 'Authorization': `Bearer ${token}` }
-      // });
-      // setDiscoveredCameras(response.data);
+      // Mapear os dados retornados para o formato esperado pelo componente
+      const formattedCameras = response.data.map(camera => ({
+        name: camera.name || `Câmera ${camera.device_type} (${camera.ip_address})`,
+        ip_address: camera.ip_address,
+        port: camera.port,
+        rtsp_url: '', // Precisamos obter isso ao selecionar a câmera
+        manufacturer: camera.manufacturer || camera.device_type,
+        model: camera.model || 'Desconhecido',
+        device_type: camera.device_type,
+        requires_auth: camera.requires_auth
+      }));
       
+      setDiscoveredCameras(formattedCameras);
     } catch (err) {
       console.error('Erro ao descobrir câmeras na rede:', err);
       setError('Não foi possível descobrir câmeras na sua rede. Verifique se estão ligadas e conectadas.');
+    } finally {
       setIsDiscovering(false);
     }
   };
@@ -73,9 +70,14 @@ const AddCameraPage = () => {
     setFormData({
       name: camera.name || '',
       ip_address: camera.ip_address || '',
+      port: camera.port || 80,
       rtsp_url: camera.rtsp_url || '',
       manufacturer: camera.manufacturer || '',
-      model: camera.model || ''
+      model: camera.model || '',
+      device_type: camera.device_type || 'onvif',
+      requires_auth: camera.requires_auth !== false,
+      username: '',
+      password: ''
     });
   };
   
@@ -85,7 +87,20 @@ const AddCameraPage = () => {
     setError(null);
     
     try {
-      const response = await axios.post('/api/devices', formData, {
+      // Preparar dados para envio
+      const deviceData = {
+        ip_address: formData.ip_address,
+        port: formData.port || 80,
+        device_type: formData.device_type || 'onvif',
+        username: formData.username || 'admin',
+        password: formData.password || '',
+        name: formData.name,
+        rtsp_port: formData.rtsp_port || 554,
+        use_https: formData.use_https || false
+      };
+      
+      // Chamar a API para conectar e adicionar a câmera
+      const response = await axios.post('/api/devices/connect', deviceData, {
         headers: {
           'Authorization': `Bearer ${token}`,
           'Content-Type': 'application/json'
@@ -96,7 +111,7 @@ const AddCameraPage = () => {
       navigate('/camera-dashboard');
     } catch (err) {
       console.error('Erro ao adicionar câmera:', err);
-      setError(err.response?.data?.message || 'Não foi possível adicionar a câmera. Por favor, tente novamente.');
+      setError(err.response?.data?.detail || 'Não foi possível adicionar a câmera. Por favor, tente novamente.');
       toast.error('Erro ao adicionar câmera');
     } finally {
       setLoading(false);
