@@ -463,4 +463,61 @@ async def discover_devices(
                         device_ips.add(key)
                         all_devices.append(device)
     
+    # Se nenhum dispositivo for encontrado, adicionar dispositivos simulados para demonstração
+    # Isso facilita testes quando não há câmeras reais disponíveis
+    if not all_devices:
+        logging.warning("Nenhum dispositivo real encontrado. Adicionando dispositivos simulados para demonstração.")
+        
+        current_time = datetime.now().isoformat()
+        
+        # Dispositivo Hikvision simulado
+        hikvision_device = {
+            "ip": "192.168.1.101",
+            "port": 80,
+            "device_type": "hikvision",
+            "device_name": "Câmera Hikvision",
+            "model": "DS-2CD2143G0-I",
+            "requires_auth": True,
+            "discovery_method": "demo_simulation",
+            "discovered_at": current_time,
+            "status": "discovered",
+            "demo_device": True
+        }
+        all_devices.append(hikvision_device)
+        
+        # Dispositivo Dahua simulado
+        dahua_device = {
+            "ip": "192.168.1.102",
+            "port": 80,
+            "device_type": "dahua",
+            "device_name": "Câmera Dahua",
+            "model": "IPC-HDW1230S",
+            "requires_auth": True,
+            "discovery_method": "demo_simulation",
+            "discovered_at": current_time,
+            "status": "discovered",
+            "demo_device": True
+        }
+        all_devices.append(dahua_device)
+        
+        # Dispositivo ONVIF genérico simulado
+        onvif_device = {
+            "ip": "192.168.1.103",
+            "port": 80,
+            "device_type": "onvif",
+            "device_name": "Câmera ONVIF",
+            "model": "Generic ONVIF Camera",
+            "requires_auth": True,
+            "discovery_method": "demo_simulation",
+            "discovered_at": current_time,
+            "status": "discovered",
+            "demo_device": True
+        }
+        all_devices.append(onvif_device)
+        
+        # Avisar no log quando estamos usando dispositivos de demonstração
+        logging.info(f"Usando {len(all_devices)} dispositivos simulados para demonstração.")
+    else:
+        logging.info(f"Encontrados {len(all_devices)} dispositivos reais na rede.")
+    
     return all_devices 

@@ -54,13 +54,20 @@ const AddCameraPage = () => {
         manufacturer: camera.manufacturer || camera.device_type,
         model: camera.model || 'Desconhecido',
         device_type: camera.device_type,
-        requires_auth: camera.requires_auth
+        requires_auth: camera.requires_auth,
+        is_demo: camera.discovery_method === 'demo_simulation'
       }));
       
       setDiscoveredCameras(formattedCameras);
+      
+      // Verificar se são dispositivos de demonstração e mostrar mensagem apropriada
+      const demoDevices = formattedCameras.filter(c => c.is_demo);
+      if (demoDevices.length > 0 && demoDevices.length === formattedCameras.length) {
+        setError("Nenhuma câmera real foi encontrada na rede. Os dispositivos mostrados são simulados para demonstração. Você também pode adicionar sua câmera manualmente preenchendo os campos abaixo.");
+      }
     } catch (err) {
       console.error('Erro ao descobrir câmeras na rede:', err);
-      setError('Não foi possível descobrir câmeras na sua rede. Verifique se estão ligadas e conectadas.');
+      setError('Não foi possível descobrir câmeras na sua rede. Verifique se estão ligadas e conectadas ou adicione manualmente.');
     } finally {
       setIsDiscovering(false);
     }
@@ -172,6 +179,9 @@ const AddCameraPage = () => {
                       <div>
                         <p className="font-medium text-gray-800">{camera.name || 'Câmera sem nome'}</p>
                         <p className="text-sm text-gray-500">{camera.ip_address} {camera.manufacturer ? `- ${camera.manufacturer}` : ''}</p>
+                        {camera.is_demo && (
+                          <p className="text-xs text-amber-600 mt-1">Dispositivo simulado para demonstração</p>
+                        )}
                       </div>
                     </div>
                   </div>
@@ -183,6 +193,19 @@ const AddCameraPage = () => {
           {error && (
             <div className="bg-red-50 border-l-4 border-red-500 text-red-700 p-4 mb-6">
               <p>{error}</p>
+              {error.includes("adicione manualmente") && (
+                <div className="mt-2 text-sm">
+                  <p className="font-medium">Como adicionar manualmente:</p>
+                  <ul className="list-disc pl-5 mt-1 space-y-1">
+                    <li>Digite um nome para identificar a câmera</li>
+                    <li>Insira o endereço IP da câmera na sua rede</li>
+                    <li>Para a URL RTSP, consulte o manual da câmera ou use os formatos comuns:</li>
+                    <li className="pl-5 text-xs">Hikvision: rtsp://[IP]:554/Streaming/Channels/101</li>
+                    <li className="pl-5 text-xs">Dahua: rtsp://[IP]:554/cam/realmonitor</li>
+                    <li className="pl-5 text-xs">ONVIF genérico: rtsp://[IP]:554/onvif1</li>
+                  </ul>
+                </div>
+              )}
             </div>
           )}
           
