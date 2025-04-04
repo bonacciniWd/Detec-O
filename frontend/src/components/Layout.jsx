@@ -1,9 +1,8 @@
-
 import React, { useState } from 'react';
-import { Link, Outlet } from 'react-router-dom'; // Importar Outlet
-import { useAuth } from '../contexts/AuthContext';
+import { Link } from 'react-router-dom'; 
+import { useAuth } from '../context/AuthContext';
 
-function Layout() {
+function Layout({ children }) { // Aceitar children como prop
   const { isAuthenticated, user, logout } = useAuth();
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
 
@@ -12,7 +11,7 @@ function Layout() {
   };
 
   return (
-    <div className="min-h-screen bg-gray-900">
+    <div className="min-h-screen bg-gray-100">
       {/* Barra de Navegação */}
       <nav className="bg-gray-800 shadow-md">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
@@ -29,7 +28,7 @@ function Layout() {
                  {isAuthenticated && (
                     <>
                       <Link to="/" className="inline-flex items-center px-1 pt-1 border-b-2 border-transparent text-sm font-medium text-gray-300 hover:border-gray-600 hover:text-gray-100">Dashboard</Link>
-                      <Link to="/cameras" className="inline-flex items-center px-1 pt-1 border-b-2 border-transparent text-sm font-medium text-gray-300 hover:border-gray-600 hover:text-gray-100">Minhas Câmeras</Link>
+                      <Link to="/camera-dashboard" className="inline-flex items-center px-1 pt-1 border-b-2 border-transparent text-sm font-medium text-gray-300 hover:border-gray-600 hover:text-gray-100">Minhas Câmeras</Link>
                       <Link to="/events" className="inline-flex items-center px-1 pt-1 border-b-2 border-transparent text-sm font-medium text-gray-300 hover:border-gray-600 hover:text-gray-100">Log de Eventos</Link>
                     </>
                  )}
@@ -106,7 +105,7 @@ function Layout() {
                   Dashboard
                 </Link>
                 <Link 
-                  to="/cameras" 
+                  to="/camera-dashboard" 
                   className="block px-3 py-2 text-base font-medium text-gray-300 hover:bg-gray-700 hover:text-white"
                   onClick={() => setMobileMenuOpen(false)}
                 >
@@ -157,8 +156,13 @@ function Layout() {
       </nav>
 
       {/* Conteúdo Principal da Rota Atual */}
-      <main>
-        <Outlet /> {/* Renderiza o componente da rota filha */} 
+      <main className="pt-2 pb-2 sm:pt-4 sm:pb-4">
+        <div className="md:flex w-full">
+          {/* Conteúdo principal, ajuste para tela inteira em mobile */}
+          <div className="w-full">
+            {children}
+          </div>
+        </div>
       </main>
     </div>
   );

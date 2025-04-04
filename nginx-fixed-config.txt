@@ -1,0 +1,76 @@
+server {
+    listen 80;
+    listen [::]:80;
+    server_name detec-o.com.br www.detec-o.com.br;
+
+    return 301 https://$host$request_uri;
+}
+
+server {
+    listen 443 ssl http2;
+    listen [::]:443 ssl http2;
+    server_name detec-o.com.br www.detec-o.com.br;
+
+    ssl_certificate /etc/letsencrypt/live/detec-o.com.br/fullchain.pem;
+    ssl_certificate_key /etc/letsencrypt/live/detec-o.com.br/privkey.pem;
+
+    # Raiz do frontend
+    root /var/www/detec-o;
+    index index.html;
+
+    # Configuração de MIME types
+    include /etc/nginx/mime.types;
+    types {
+        application/javascript js;
+    }
+    default_type application/octet-stream;
+
+    # Desabilitar verificação de permissões específicas
+    autoindex off;
+    disable_symlinks off;
+
+    # CORS aberto para todos
+    add_header Access-Control-Allow-Origin '*' always;
+    
+    # Regra específica para arquivos JavaScript
+    location ~ \.js$ {
+        add_header Content-Type application/javascript;
+        add_header X-Content-Type-Options nosniff;
+        add_header Access-Control-Allow-Origin '*' always;
+        
+        # Garantir que todos os arquivos sejam servidos
+        try_files $uri =404;
+    }
+    
+    # Servir arquivos de assets diretamente
+    location /assets/ {
+        alias /var/www/detec-o/assets/;
+        expires max;
+        add_header Cache-Control 'public, max-age=31536000';
+        add_header Access-Control-Allow-Origin '*' always;
+    }
+    
+    # Single Page Application
+    location / {
+        try_files $uri $uri/ /index.html;
+    }
+    
+    # API proxying
+    location /api/ {
+        proxy_pass http://127.0.0.1:8080;
+        proxy_http_version 1.1;
+        proxy_set_header Upgrade $http_upgrade;
+        proxy_set_header Connection 'upgrade';
+        proxy_set_header Host $host;
+        proxy_cache_bypass $http_upgrade;
+    }
+    
+    location /auth/ {
+        proxy_pass http://127.0.0.1:8080;
+        proxy_http_version 1.1;
+        proxy_set_header Upgrade $http_upgrade;
+        proxy_set_header Connection 'upgrade';
+        proxy_set_header Host $host;
+        proxy_cache_bypass $http_upgrade;
+    }
+} 

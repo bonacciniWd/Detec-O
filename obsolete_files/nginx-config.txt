@@ -1,0 +1,50 @@
+server {
+    listen 80;
+    server_name detec-o.com.br www.detec-o.com.br;
+    
+    # Redirecionar HTTP para HTTPS
+    return 301 https://$host$request_uri;
+}
+
+server {
+    listen 443 ssl;
+    server_name detec-o.com.br www.detec-o.com.br;
+    
+    # Configurações SSL
+    ssl_certificate /etc/letsencrypt/live/detec-o.com.br/fullchain.pem;
+    ssl_certificate_key /etc/letsencrypt/live/detec-o.com.br/privkey.pem;
+    
+    # Raiz do frontend
+    root /home/denisbonaccini/Detec-O/frontend/dist;
+    index index.html;
+    
+    # Configurações de cache
+    location ~* \.(css|js|jpg|jpeg|png|gif|ico|svg)$ {
+        expires 30d;
+        add_header Cache-Control "public, no-transform";
+    }
+    
+    # Proxy para API de backend
+    location /auth/ {
+        proxy_pass http://localhost:8080/auth/;
+        proxy_http_version 1.1;
+        proxy_set_header Upgrade $http_upgrade;
+        proxy_set_header Connection 'upgrade';
+        proxy_set_header Host $host;
+        proxy_cache_bypass $http_upgrade;
+    }
+    
+    location /api/ {
+        proxy_pass http://localhost:8080/api/;
+        proxy_http_version 1.1;
+        proxy_set_header Upgrade $http_upgrade;
+        proxy_set_header Connection 'upgrade';
+        proxy_set_header Host $host;
+        proxy_cache_bypass $http_upgrade;
+    }
+    
+    # Configuração SPA - redireciona todas as rotas não encontradas para index.html
+    location / {
+        try_files $uri $uri/ /index.html;
+    }
+}

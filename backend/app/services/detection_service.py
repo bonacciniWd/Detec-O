@@ -3,7 +3,10 @@ from datetime import datetime, timedelta
 from motor.motor_asyncio import AsyncIOMotorDatabase
 from bson import ObjectId
 import logging
-from typing import Dict, Any, List, Optional
+from typing import Dict, Any, List, Optional, Union
+import os
+import uuid
+from pathlib import Path
 
 # Configuração de logging
 logging.basicConfig(level=logging.INFO)
@@ -27,48 +30,256 @@ OBJECT_SIMILARITY_MAP = {
 class DetectionService:
     """Serviço para gerenciar detecções de câmeras."""
     
-    def __init__(self, db: AsyncIOMotorDatabase):
-        self.db = db
+    def __init__(self):
+        self.db = None
+        self.collection = None
         # Cache para armazenar o timestamp da última detecção por câmera/tipo
         self._last_detections: Dict[str, Dict[str, datetime]] = {}
         
-    async def get_detection_settings(self, user_id: str, camera_id: Optional[str] = None) -> dict:
-        """
-        Obtém as configurações de detecção para um usuário/câmera.
-        Se não houver configuração específica para a câmera, retorna configuração global.
-        """
-        settings = None
+    async def initialize(self):
+        """Inicializar serviço com conexão ao banco de dados."""
+        self.db = await get_database()
+        self.collection = self.db.detection_settings
         
-        if camera_id:
-            # Buscar configuração específica da câmera
-            settings = await self.db.detection_settings.find_one({
-                "user_id": str(user_id),
-                "camera_id": camera_id
-            })
+    async def create_settings(self, user_id: str, camera_id: Optional[str], settings: DetectionSettingsCreate) -> DetectionSettingsResponse:
+        """Cria novas configurações de detecção para um usuário e câmera."""
+        # Verificar se já existem configurações para esta câmera
+        existing = await self.collection.find_one({
+            "user_id": user_id,
+            "camera_id": camera_id
+        })
         
-        if not settings:
-            # Buscar configuração global do usuário
-            settings = await self.db.detection_settings.find_one({
-                "user_id": str(user_id),
+        if existing:
+            # Atualizar configurações existentes
+            return await self.update_settings(user_id, camera_id, settings)
+        
+        # Criar novo documento
+        now = datetime.now()
+        settings_dict = {
+            **settings.dict(),
+            "user_id": user_id,
+            "camera_id": camera_id,
+            "created_at": now,
+            "updated_at": now
+        }
+        
+        result = await self.collection.insert_one(settings_dict)
+        
+        # Recuperar o documento inserido
+        inserted = await self.collection.find_one({"_id": result.inserted_id})
+        
+        if inserted:
+            # Converter ObjectId para string
+            inserted["id"] = str(inserted["_id"])
+            del inserted["_id"]
+            return DetectionSettingsResponse(**inserted)
+        
+        return None
+        
+    async def get_settings(self, user_id: str, camera_id: Optional[str]) -> Optional[DetectionSettingsResponse]:
+        """Obtém configurações de detecção para um usuário e câmera."""
+        # Buscar configurações específicas para esta câmera
+        settings = await self.collection.find_one({
+            "user_id": user_id,
+            "camera_id": camera_id
+        })
+        
+        # Se não encontrou, usar configurações globais do usuário
+        if not settings and camera_id:
+            settings = await self.collection.find_one({
+                "user_id": user_id,
                 "camera_id": None
             })
+            
+        if settings:
+            # Converter ObjectId para string
+            settings["id"] = str(settings["_id"])
+            del settings["_id"]
+            return DetectionSettingsResponse(**settings)
+            
+        # Se não encontrou configurações, criar uma nova com valores padrão
+        return await self.create_settings(
+            user_id, 
+            camera_id, 
+            DetectionSettingsCreate()
+        )
         
-        # Se não houver configuração, retorna configuração padrão
+    async def update_settings(self, user_id: str, camera_id: Optional[str], settings_update: DetectionSettingsUpdate) -> Optional[DetectionSettingsResponse]:
+        """Atualiza configurações de detecção existentes."""
+        # Verificar se existem configurações para atualizar
+        existing = await self.collection.find_one({
+            "user_id": user_id,
+            "camera_id": camera_id
+        })
+        
+        if not existing:
+            # Criar novas configurações se não existirem
+            return await self.create_settings(
+                user_id, 
+                camera_id, 
+                DetectionSettingsCreate(**settings_update.dict(exclude_unset=True))
+            )
+        
+        # Preparar atualização
+        update_data = settings_update.dict(exclude_unset=True)
+        update_data["updated_at"] = datetime.now()
+        
+        # Atualizar documento
+        await self.collection.update_one(
+            {"_id": existing["_id"]},
+            {"$set": update_data}
+        )
+        
+        # Recuperar documento atualizado
+        updated = await self.collection.find_one({"_id": existing["_id"]})
+        
+        if updated:
+            # Converter ObjectId para string
+            updated["id"] = str(updated["_id"])
+            del updated["_id"]
+            return DetectionSettingsResponse(**updated)
+            
+        return None
+    
+    async def get_camera_preview(self, user_id: str, camera_id: str) -> Optional[str]:
+        """
+        Obtém o caminho para uma imagem de preview da câmera.
+        
+        Em ambiente de produção, isso buscaria um frame atual da câmera.
+        Para desenvolvimento, usamos uma imagem estática de exemplo.
+        """
+        # Em um ambiente real, buscar imagem atual da câmera
+        # Para desenvolvimento, usar uma imagem de exemplo
+        # Verificar diretório de assets estáticos
+        static_dir = Path(__file__).parent.parent / "static" / "camera_previews"
+        
+        # Criar diretório se não existir
+        os.makedirs(static_dir, exist_ok=True)
+        
+        # Caminho para uma imagem de exemplo baseada no ID da câmera
+        # Em produção, seria gerado dinamicamente a partir do stream da câmera
+        example_file = f"camera_{camera_id[-4:] if len(camera_id) >= 4 else camera_id}.jpg"
+        example_path = static_dir / example_file
+        
+        # Se não tiver um exemplo específico, usar imagem padrão
+        if not example_path.exists():
+            default_examples = ["example1.jpg", "example2.jpg", "example3.jpg"]
+            # Usar hash do camera_id para selecionar um exemplo aleatório mas consistente
+            example_index = hash(camera_id) % len(default_examples)
+            example_file = default_examples[example_index]
+            example_path = static_dir / example_file
+            
+            # Se ainda não existir, criar uma imagem preta simples (placeholder)
+            if not example_path.exists():
+                # Em um ambiente real, usaríamos uma biblioteca como Pillow
+                # para criar uma imagem preta, mas por simplicidade vamos apenas
+                # retornar uma URL para uma imagem placeholder
+                return f"/static/camera_previews/placeholder.jpg"
+        
+        # Retornar caminho relativo da imagem para uso no frontend
+        return f"/static/camera_previews/{example_file}"
+    
+    async def apply_detection_zones(self, frame, camera_id: str, user_id: str):
+        """
+        Aplica as zonas de detecção configuradas a um frame.
+        Apenas objetos dentro das zonas ativas serão detectados.
+        
+        Em ambiente de produção, isso seria usado pelo algoritmo de detecção.
+        """
+        settings = await self.get_settings(user_id, camera_id)
         if not settings:
-            return {
-                "min_confidence": 0.6,
-                "detection_interval": 30,
-                "enabled_event_types": ["person", "vehicle", "animal"],
-                "notification_enabled": True,
-                "red_events_enabled": True,
-                "yellow_events_enabled": True,
-                "blue_events_enabled": True,
-                "red_confidence_threshold": 0.7,
-                "yellow_confidence_threshold": 0.6,
-                "blue_confidence_threshold": 0.5
-            }
+            # Se não há configurações, detectar em todo o frame
+            return frame, False
+            
+        # Verificar se há zonas de detecção definidas
+        if not settings.detection_zones or not settings.use_zones_only:
+            # Se não há zonas ou não é para usar apenas as zonas, detectar em todo o frame
+            return frame, False
+            
+        # Em uma implementação real, aqui aplicaríamos uma máscara ao frame
+        # baseado nas zonas de detecção, para que apenas objetos dentro das
+        # zonas fossem detectados
         
-        return settings
+        # Por simplicidade, apenas retornamos o frame original e um flag
+        # indicando que as zonas devem ser aplicadas
+        return frame, True
+    
+    async def check_object_in_zones(self, detection_result, camera_id: str, user_id: str):
+        """
+        Verifica se um objeto detectado está dentro de alguma zona de detecção.
+        
+        Args:
+            detection_result: Resultado da detecção com coordenadas (x, y, w, h)
+            camera_id: ID da câmera
+            user_id: ID do usuário
+            
+        Returns:
+            Tupla (bool, str): (está em zona, nome da zona)
+        """
+        settings = await self.get_settings(user_id, camera_id)
+        if not settings or not settings.detection_zones or not settings.use_zones_only:
+            # Se não há configurações ou zonas, considerar como fora de zona
+            return True, "Global"
+            
+        # Extrair coordenadas do objeto detectado (normalizado 0-1)
+        # Formato exemplo: {x: 0.2, y: 0.3, width: 0.1, height: 0.2}
+        x = detection_result.get("x", 0)
+        y = detection_result.get("y", 0)
+        w = detection_result.get("width", 0)
+        h = detection_result.get("height", 0)
+        
+        # Pontos do centro do objeto
+        center_x = x + w/2
+        center_y = y + h/2
+        
+        # Verificar cada zona
+        for zone in settings.detection_zones:
+            if not zone.enabled:
+                continue
+                
+            # Verificar se o objeto está dentro desta zona
+            if self._point_in_polygon(center_x, center_y, zone.points):
+                # Verificar se a classe do objeto é válida para esta zona
+                obj_class = detection_result.get("class", "")
+                if (not zone.detection_classes or 
+                    obj_class in zone.detection_classes):
+                    return True, zone.name
+                    
+        # Se chegou aqui, não está em nenhuma zona habilitada
+        return False, None
+    
+    def _point_in_polygon(self, x: float, y: float, points: List[Dict[str, float]]) -> bool:
+        """
+        Verifica se um ponto está dentro de um polígono usando o algoritmo ray-casting.
+        
+        Args:
+            x: Coordenada X do ponto
+            y: Coordenada Y do ponto
+            points: Lista de pontos do polígono [{x: float, y: float}, ...]
+            
+        Returns:
+            bool: True se o ponto estiver dentro do polígono
+        """
+        if len(points) < 3:
+            return False
+            
+        n = len(points)
+        inside = False
+        
+        p1x, p1y = points[0]["x"], points[0]["y"]
+        for i in range(1, n + 1):
+            p2x, p2y = points[i % n]["x"], points[i % n]["y"]
+            
+            if y > min(p1y, p2y):
+                if y <= max(p1y, p2y):
+                    if x <= max(p1x, p2x):
+                        if p1y != p2y:
+                            xinters = (y - p1y) * (p2x - p1x) / (p2y - p1y) + p1x
+                        if p1x == p2x or x <= xinters:
+                            inside = not inside
+            p1x, p1y = p2x, p2y
+            
+        return inside
     
     async def should_process_detection(self, 
                                       user_id: str, 
@@ -79,20 +290,20 @@ class DetectionService:
         Verifica se uma detecção deve ser processada com base nas configurações
         e no intervalo desde a última detecção do mesmo tipo.
         """
-        settings = await self.get_detection_settings(user_id, camera_id)
+        settings = await self.get_settings(user_id, camera_id)
         
         # Verificar se o tipo de evento está habilitado
-        if event_type not in settings.get("enabled_event_types", []):
+        if event_type not in settings.enabled_event_types:
             logger.info(f"Evento {event_type} ignorado: tipo não habilitado")
             return False
         
         # Verificar confiança mínima
-        if confidence < settings.get("min_confidence", 0.6):
+        if confidence < settings.min_confidence:
             logger.info(f"Evento {event_type} ignorado: confiança ({confidence}) abaixo do mínimo")
             return False
         
         # Verificar intervalo entre detecções
-        detection_interval = settings.get("detection_interval", 30)
+        detection_interval = settings.detection_interval
         camera_key = f"{user_id}:{camera_id}"
         
         now = datetime.utcnow()
@@ -165,31 +376,31 @@ class DetectionService:
         """
         # Verificar se o evento é crítico (vermelho)
         if event_type in ["weapon", "gun", "knife", "aggression", "fight", "violence"]:
-            return "red" if settings.get("red_events_enabled", True) else "blue"
+            return "red" if settings.red_events_enabled else "blue"
         
         # Verificar metadados para potenciais ameaças
         if metadata.get("is_weapon") or metadata.get("potential_aggression"):
-            return "red" if settings.get("red_events_enabled", True) else "blue"
+            return "red" if settings.red_events_enabled else "blue"
             
         # Verificar metadados para situações específicas
         if metadata.get("is_suspicious") or metadata.get("is_potential_threat"):
-            return "yellow" if settings.get("yellow_events_enabled", True) else "blue"
+            return "yellow" if settings.yellow_events_enabled else "blue"
         
         if "time_in_location" in metadata and metadata["time_in_location"] > 60:  # mais de 1 minuto
-            if confidence >= settings.get("red_confidence_threshold", 0.7):
-                return "red" if settings.get("red_events_enabled", True) else "blue"
-            elif confidence >= settings.get("yellow_confidence_threshold", 0.6):
-                return "yellow" if settings.get("yellow_events_enabled", True) else "blue"
+            if confidence >= settings.red_confidence_threshold:
+                return "red" if settings.red_events_enabled else "blue"
+            elif confidence >= settings.yellow_confidence_threshold:
+                return "yellow" if settings.yellow_events_enabled else "blue"
         
         # Objetos comumente confundidos com armas ou objetos perigosos
         if event_type in OBJECT_SIMILARITY_MAP:
-            return "yellow" if settings.get("yellow_events_enabled", True) else "blue"
+            return "yellow" if settings.yellow_events_enabled else "blue"
         
         # Determinar com base na confiança
-        if confidence >= settings.get("red_confidence_threshold", 0.7):
-            return "red" if settings.get("red_events_enabled", True) else "blue"
-        elif confidence >= settings.get("yellow_confidence_threshold", 0.6):
-            return "yellow" if settings.get("yellow_events_enabled", True) else "blue"
+        if confidence >= settings.red_confidence_threshold:
+            return "red" if settings.red_events_enabled else "blue"
+        elif confidence >= settings.yellow_confidence_threshold:
+            return "yellow" if settings.yellow_events_enabled else "blue"
         
         # Padrão é azul (informativo)
         return "blue"
@@ -209,7 +420,7 @@ class DetectionService:
         if not await self.should_process_detection(user_id, camera_id, event_type, confidence):
             return None
         
-        settings = await self.get_detection_settings(user_id, camera_id)
+        settings = await self.get_settings(user_id, camera_id)
         metadata = metadata or {}
         
         # Enriquecer metadados com avaliação de potencial ameaça
@@ -245,7 +456,7 @@ class DetectionService:
         logger.info(f"Evento criado: {event_id} | Tipo: {event_type} | Severidade: {severity}")
         
         # Verificar se notificações estão habilitadas
-        if settings.get("notification_enabled", True):
+        if settings.notification_enabled:
             # Aqui poderia ser implementado um serviço de notificações
             # como envio de e-mail, push, etc.
             # Para ameaças graves (red), poderia haver notificações prioritárias
@@ -312,4 +523,7 @@ class DetectionService:
             },
             "precision_rate": precision_rate,
             "period_days": days
-        } 
+        }
+
+# Criar instância global do serviço
+detection_service = DetectionService() 

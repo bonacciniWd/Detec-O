@@ -1,8 +1,10 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import eventService from '../services/eventService';
 import cameraService from '../services/cameraService';
 import EventImage from '../components/EventImage';
 import FeedbackControl from '../components/FeedbackControl';
+import { formatDistanceToNow } from 'date-fns';
+import { ptBR } from 'date-fns/locale';
 
 function EventsPage() {
   const [events, setEvents] = useState([]);
@@ -15,6 +17,7 @@ function EventsPage() {
 
   // Estado para paginação
   const [currentPage, setCurrentPage] = useState(1);
+  const [totalPages, setTotalPages] = useState(1);
   const [totalEvents, setTotalEvents] = useState(0);
   const [eventsPerPage, setEventsPerPage] = useState(10);
 
@@ -24,13 +27,37 @@ function EventsPage() {
   const [filterType, setFilterType] = useState('');
   const [filterDateStart, setFilterDateStart] = useState('');
   const [filterDateEnd, setFilterDateEnd] = useState('');
-  const [filterConfidence, setFilterConfidence] = useState(0);
+  const [filterConfidence, setFilterConfidence] = useState(50);
   const [filterFeedback, setFilterFeedback] = useState('');
+  // Adicionando estado para controlar quando aplicar filtros
+  const [shouldApplyFilters, setShouldApplyFilters] = useState(false);
+
+  // Estado para o modal de detalhes
+  const [showModal, setShowModal] = useState(false);
+  
+  // Estado para o feedback do evento
+  const [feedbackConfidence, setFeedbackConfidence] = useState(50);
+  const [feedbackType, setFeedbackType] = useState("true_positive");
 
   // Função para buscar câmeras (para mapear ID para nome)
   const fetchCameras = async () => {
     try {
-      const cameraList = await cameraService.getCameras();
+      const response = await cameraService.getCameras();
+      let cameraList = response;
+      
+      // Verificar formato da resposta
+      if (response && response.items) {
+        cameraList = response.items;
+      }
+      
+      // Garantir que temos um array
+      if (!Array.isArray(cameraList)) {
+        console.error("Resposta da API não é um array:", cameraList);
+        setCameras({});
+        return;
+      }
+      
+      // Mapear câmeras por ID
       const cameraMap = cameraList.reduce((acc, cam) => {
         acc[cam.id] = cam;
         return acc;
@@ -41,51 +68,87 @@ function EventsPage() {
     }
   };
 
-  // Função para buscar eventos
+  // Função para buscar eventos com base nos filtros e paginação
   const fetchEvents = async () => {
     setIsLoading(true);
     setError(null);
+    
     try {
+      // Construir parâmetros de filtro
       const params = {
         page: currentPage,
-        limit: eventsPerPage
+        limit: 10,
       };
       
-      // Adicionar filtros se presentes
-      if (filterDays) params.days = filterDays;
-      if (filterCameraId) params.camera_id = filterCameraId;
-      if (filterType) params.event_type = filterType;
-      if (filterDateStart) params.date_start = filterDateStart;
-      if (filterDateEnd) params.date_end = filterDateEnd;
-      if (filterConfidence > 0) params.min_confidence = filterConfidence / 100;
-      if (filterFeedback) params.feedback = filterFeedback;
-
+      // Adicionar filtros condicionalmente
+      if (filterDays > 0) {
+        const fromDate = new Date();
+        fromDate.setDate(fromDate.getDate() - filterDays);
+        params.from_date = fromDate.toISOString().split('T')[0];
+      } else if (filterDateStart) {
+        params.from_date = filterDateStart;
+      }
+      
+      if (filterDateEnd) {
+        params.to_date = filterDateEnd;
+      }
+      
+      if (filterCameraId) {
+        params.camera_id = filterCameraId;
+      }
+      
+      if (filterType) {
+        params.event_type = filterType;
+      }
+      
+      if (filterConfidence > 0) {
+        params.min_confidence = filterConfidence / 100;
+      }
+      
+      if (filterFeedback) {
+        params.feedback = filterFeedback;
+      }
+      
+      // Buscar dados da API
       const data = await eventService.getEvents(params);
       
-      if (Array.isArray(data)) {
-        setEvents(data);
-        setTotalEvents(data.length);
-      } else if (data && Array.isArray(data.items)) {
-        setEvents(data.items);
-        setTotalEvents(data.total || data.items.length);
+      // Atualizar estados com os dados recebidos
+      setEvents(data.events || []);
+      setTotalPages(data.total_pages || 1);
+      setTotalEvents(data.total_events || 0);
+      
+      // Buscar câmeras se ainda não foram carregadas
+      if (Object.keys(cameras).length === 0) {
+        fetchCameras();
       }
     } catch (err) {
-      setError('Falha ao carregar eventos.');
-      console.error(err);
+      console.error("Erro ao buscar eventos:", err);
+      setError("Não foi possível carregar os eventos. Tente novamente mais tarde.");
+      setEvents([]);
     } finally {
       setIsLoading(false);
+      setShouldApplyFilters(false);
     }
   };
 
   // Efeito para buscar câmeras na montagem inicial
   useEffect(() => {
     fetchCameras();
+    setShouldApplyFilters(true);
   }, []);
 
   // Efeito para re-buscar eventos quando os filtros ou paginação mudam
   useEffect(() => {
-    fetchEvents();
-  }, [currentPage, eventsPerPage, filterDays, filterCameraId, filterType, filterDateStart, filterDateEnd, filterConfidence, filterFeedback]);
+    if (shouldApplyFilters || currentPage > 1 || eventsPerPage !== 10) {
+      fetchEvents();
+    }
+  }, [currentPage, eventsPerPage, shouldApplyFilters]);
+
+  // Atualizar o totalPages calculando-o com base no totalEvents
+  useEffect(() => {
+    // Calcular total de páginas com base no total de eventos e itens por página
+    setTotalPages(Math.ceil(totalEvents / eventsPerPage));
+  }, [totalEvents, eventsPerPage]);
 
   // Helper para formatar data
   const formatDate = (dateString) => {
@@ -112,9 +175,6 @@ function EventsPage() {
     setSelectedEvent(null);
   };
 
-  // Calcular total de páginas
-  const totalPages = Math.ceil(totalEvents / eventsPerPage);
-
   // Navegação de páginas
   const goToPage = (page) => {
     if (page >= 1 && page <= totalPages) {
@@ -140,6 +200,12 @@ function EventsPage() {
     }
   };
 
+  // Função para lidar com aplicação de filtros
+  const handleApplyFilters = () => {
+    setCurrentPage(1);
+    setShouldApplyFilters(true);
+  };
+
   // Classes reutilizáveis para tema escuro
   const cardClass = "bg-gray-800 shadow overflow-hidden sm:rounded-lg";
   const cardHeaderClass = "px-4 py-5 sm:px-6 border-b border-gray-700";
@@ -150,6 +216,7 @@ function EventsPage() {
   const selectClass = "mt-1 block w-full pl-3 pr-10 py-3 text-base border-gray-700 bg-gray-700 text-white focus:outline-none focus:ring-blue-500 focus:border-blue-500 rounded-md";
   const buttonClass = "text-gray-300 hover:bg-gray-700 hover:text-white px-3 py-2 rounded-md text-sm font-medium";
   const activeButtonClass = "bg-gray-900 text-white px-3 py-2 rounded-md text-sm font-medium";
+  const sliderTrackClass = "w-full h-2 bg-gray-700 rounded-lg appearance-none cursor-pointer"; 
 
   // Função para renderizar indicador de feedback
   const renderFeedbackIndicator = (feedback) => {
@@ -171,22 +238,22 @@ function EventsPage() {
   };
 
   return (
-    <div className="space-y-6 bg-gray-900 min-h-screen pb-12">
+    <div className="space-y-4 bg-gray-900 min-h-screen pb-8">
       {/* Cabeçalho */}
       <header className="bg-gray-800 shadow">
-        <div className="max-w-7xl mx-auto py-6 px-4 sm:px-6 lg:px-8">
-          <h1 className="text-3xl font-bold text-white">Log de Eventos</h1>
+        <div className="max-w-7xl mx-auto py-4 px-4 sm:px-6 lg:px-8">
+          <h1 className="text-2xl sm:text-3xl font-bold text-white">Log de Eventos</h1>
         </div>
       </header>
 
       {/* Conteúdo Principal */}
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+      <div className="max-w-7xl mx-auto px-3 sm:px-6 lg:px-8">
         {/* Card de Filtros */}
-        <div className={`${cardClass} mb-6`}>
+        <div className={`${cardClass} mb-4`}>
           <div className={cardHeaderClass}>
             <h3 className={cardTitleClass}>Filtrar Eventos</h3>
           </div>
-          <div className={`${cardContentClass} grid grid-cols-1 md:grid-cols-3 gap-6`}>
+          <div className={`${cardContentClass} grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4`}>
             <div>
               <label htmlFor="filter-days" className={labelClass}>Dias Anteriores:</label>
               <input 
@@ -250,18 +317,73 @@ function EventsPage() {
             </div>
             <div>
               <label htmlFor="filter-confidence" className={labelClass}>
-                Confiança Mínima: {filterConfidence}%
+                Confiança Mínima: <span className="text-blue-400 font-bold">{filterConfidence}%</span>
               </label>
-              <input 
-                type="range" 
-                id="filter-confidence" 
-                min="0" 
-                max="95" 
-                step="5"
-                value={filterConfidence}
-                onChange={(e) => setFilterConfidence(parseInt(e.target.value))}
-                className="w-full h-2 bg-gray-700 rounded-lg appearance-none cursor-pointer"
-              />
+              <div className="relative">
+                <div className="flex items-center">
+                  <input 
+                    type="range" 
+                    id="filter-confidence" 
+                    min="0" 
+                    max="95" 
+                    step="5"
+                    value={filterConfidence}
+                    onChange={(e) => setFilterConfidence(parseInt(e.target.value))}
+                    className={`${sliderTrackClass} slider-thumb-custom`}
+                    style={{
+                      background: `linear-gradient(to right, #3B82F6 0%, #3B82F6 ${filterConfidence}%, #374151 ${filterConfidence}%, #374151 100%)`
+                    }}
+                  />
+                </div>
+                <style global jsx>{`
+                  .slider-thumb-custom::-webkit-slider-thumb {
+                    -webkit-appearance: none;
+                    appearance: none;
+                    width: 16px;
+                    height: 16px;
+                    border-radius: 50%;
+                    background: #3B82F6;
+                    box-shadow: 0 0 2px #3B82F6;
+                    cursor: pointer;
+                    transition: all 0.2s ease;
+                  }
+                  .slider-thumb-custom::-webkit-slider-thumb:hover {
+                    transform: scale(1.2);
+                    box-shadow: 0 0 4px #3B82F6;
+                  }
+                  .slider-thumb-custom::-moz-range-thumb {
+                    width: 16px;
+                    height: 16px;
+                    border-radius: 50%;
+                    background: #3B82F6;
+                    box-shadow: 0 0 2px #3B82F6;
+                    cursor: pointer;
+                    transition: all 0.2s ease;
+                    border: none;
+                  }
+                  .slider-thumb-custom::-moz-range-thumb:hover {
+                    transform: scale(1.2);
+                    box-shadow: 0 0 4px #3B82F6;
+                  }
+                  /* Para Edge/IE */
+                  .slider-thumb-custom::-ms-thumb {
+                    width: 16px;
+                    height: 16px;
+                    border-radius: 50%;
+                    background: #3B82F6;
+                    box-shadow: 0 0 2px #3B82F6;
+                    cursor: pointer;
+                    border: none;
+                  }
+                `}</style>
+              </div>
+              <div className="flex justify-between text-xs text-gray-400 mt-1">
+                <span>0%</span>
+                <span>25%</span>
+                <span>50%</span>
+                <span>75%</span>
+                <span>95%</span>
+              </div>
             </div>
             <div>
               <label htmlFor="filter-feedback" className={labelClass}>Feedback:</label>
@@ -280,10 +402,8 @@ function EventsPage() {
             </div>
             <div className="flex items-end">
               <button 
-                onClick={() => {
-                  setCurrentPage(1);
-                  fetchEvents();
-                }}
+                type="button"
+                onClick={handleApplyFilters}
                 className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
               >
                 Aplicar Filtros
@@ -316,49 +436,94 @@ function EventsPage() {
               
               {!isLoading && !error && events.length > 0 && (
                 <>
-                  <table className="min-w-full divide-y divide-gray-700">
-                    <thead className="bg-gray-700">
-                      <tr>
-                        <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-300 uppercase tracking-wider">Timestamp</th>
-                        <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-300 uppercase tracking-wider">Tipo</th>
-                        <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-300 uppercase tracking-wider">Câmera</th>
-                        <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-300 uppercase tracking-wider">Confiança</th>
-                        <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-300 uppercase tracking-wider">Feedback</th>
-                        <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-300 uppercase tracking-wider">Ações</th>
-                      </tr>
-                    </thead>
-                    <tbody className="bg-gray-800 divide-y divide-gray-700">
+                  <div className="block lg:hidden">
+                    {/* Versão mobile: cards em vez de tabela */}
+                    <div className="divide-y divide-gray-700">
                       {events.map((event) => (
-                        <tr key={event.id} className="hover:bg-gray-700">
-                          <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-300">{formatDate(event.timestamp)}</td>
-                          <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-100">
-                            {event.detection_type || event.event_type || 'Evento'}
-                          </td>
-                          <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-300">
-                            {cameras[event.camera_id]?.name || event.camera_name || event.camera_id || 'N/A'}
-                          </td>
-                          <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-300">
-                            {event.confidence ? `${Math.round(event.confidence * 100)}%` : 'N/A'}
-                          </td>
-                          <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-300">
-                            {renderFeedbackIndicator(event.feedback)}
-                          </td>
-                          <td className="px-6 py-4 whitespace-nowrap text-sm text-right">
-                            <button
-                              className="text-blue-400 hover:text-blue-300"
-                              onClick={() => showEventDetails(event)}
-                            >
-                              Ver Detalhes
-                            </button>
-                          </td>
-                        </tr>
+                        <div key={event.id} className="p-4 hover:bg-gray-700">
+                          <div className="flex justify-between items-start mb-2">
+                            <div className="font-medium text-gray-100">
+                              {event.detection_type || event.event_type || 'Evento'}
+                            </div>
+                            <div className="text-xs text-gray-400">
+                              {formatDate(event.timestamp)}
+                            </div>
+                          </div>
+                          <div className="flex flex-col space-y-1 text-sm text-gray-300 mb-2">
+                            <div>
+                              <span className="text-gray-400">Câmera: </span>
+                              {cameras[event.camera_id]?.name || event.camera_name || event.camera_id || 'N/A'}
+                            </div>
+                            {event.confidence && (
+                              <div>
+                                <span className="text-gray-400">Confiança: </span>
+                                {Math.round(event.confidence * 100)}%
+                              </div>
+                            )}
+                            {event.feedback && (
+                              <div>
+                                <span className="text-gray-400">Feedback: </span>
+                                {renderFeedbackIndicator(event.feedback)}
+                              </div>
+                            )}
+                          </div>
+                          <button
+                            className="mt-1 text-blue-400 hover:text-blue-300 text-sm"
+                            onClick={() => showEventDetails(event)}
+                          >
+                            Ver Detalhes
+                          </button>
+                        </div>
                       ))}
-                    </tbody>
-                  </table>
+                    </div>
+                  </div>
+
+                  {/* Versão desktop: tabela */}
+                  <div className="hidden lg:block">
+                    <table className="min-w-full divide-y divide-gray-700">
+                      <thead className="bg-gray-700">
+                        <tr>
+                          <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-300 uppercase tracking-wider">Timestamp</th>
+                          <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-300 uppercase tracking-wider">Tipo</th>
+                          <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-300 uppercase tracking-wider">Câmera</th>
+                          <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-300 uppercase tracking-wider">Confiança</th>
+                          <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-300 uppercase tracking-wider">Feedback</th>
+                          <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-300 uppercase tracking-wider">Ações</th>
+                        </tr>
+                      </thead>
+                      <tbody className="bg-gray-800 divide-y divide-gray-700">
+                        {events.map((event) => (
+                          <tr key={event.id} className="hover:bg-gray-700">
+                            <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-300">{formatDate(event.timestamp)}</td>
+                            <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-100">
+                              {event.detection_type || event.event_type || 'Evento'}
+                            </td>
+                            <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-300">
+                              {cameras[event.camera_id]?.name || event.camera_name || event.camera_id || 'N/A'}
+                            </td>
+                            <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-300">
+                              {event.confidence ? `${Math.round(event.confidence * 100)}%` : 'N/A'}
+                            </td>
+                            <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-300">
+                              {renderFeedbackIndicator(event.feedback)}
+                            </td>
+                            <td className="px-6 py-4 whitespace-nowrap text-sm text-right">
+                              <button
+                                className="text-blue-400 hover:text-blue-300"
+                                onClick={() => showEventDetails(event)}
+                              >
+                                Ver Detalhes
+                              </button>
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
                   
                   {/* Controles de Paginação */}
                   <div className="px-4 py-3 flex items-center justify-between border-t border-gray-700 sm:px-6">
-                    <div className="flex-1 flex justify-between sm:hidden">
+                    <div className="flex-1 flex justify-between lg:hidden">
                       {/* Controles Mobile */}
                       <button
                         onClick={() => goToPage(currentPage - 1)}
@@ -379,7 +544,7 @@ function EventsPage() {
                       </button>
                     </div>
                     
-                    <div className="hidden sm:flex-1 sm:flex sm:items-center sm:justify-between">
+                    <div className="hidden lg:flex-1 lg:flex lg:items-center lg:justify-between">
                       {/* Controles Desktop */}
                       <div>
                         <p className="text-sm text-gray-400">
@@ -525,7 +690,7 @@ function EventsPage() {
                       <div className="md:col-span-2 space-y-4">
                         <div>
                           <div className="text-sm font-medium text-gray-400">ID do Evento:</div>
-                          <div className="text-sm text-gray-200">{selectedEvent.id}</div>
+                          <div className="text-sm text-gray-200 break-all">{selectedEvent.id}</div>
                         </div>
                         
                         <div>

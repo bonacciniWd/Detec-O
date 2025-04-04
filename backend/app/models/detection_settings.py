@@ -1,7 +1,20 @@
 from pydantic import BaseModel, Field, validator
-from typing import Optional, List
+from typing import Optional, List, Dict, Any
 from datetime import datetime
 
+# Modelo para representar um ponto de um polígono
+class Point(BaseModel):
+    x: float = Field(..., description="Coordenada X do ponto (0-1 ou pixel)")
+    y: float = Field(..., description="Coordenada Y do ponto (0-1 ou pixel)")
+
+# Modelo para representar uma zona de detecção
+class DetectionZone(BaseModel):
+    id: str = Field(..., description="Identificador único da zona")
+    name: str = Field(..., description="Nome da zona")
+    points: List[Point] = Field(..., description="Pontos que formam o polígono da zona")
+    enabled: bool = Field(True, description="Se a zona está ativa")
+    detection_classes: Optional[List[str]] = Field(None, description="Classes específicas para detecção nesta zona")
+    
 class DetectionSettingsBase(BaseModel):
     """Modelo base para configurações de detecção."""
     min_confidence: float = Field(0.6, ge=0.0, le=1.0, description="Confiança mínima para considerar uma detecção (0.0-1.0)")
@@ -20,7 +33,9 @@ class DetectionSettingsBase(BaseModel):
     blue_confidence_threshold: float = Field(0.5, ge=0.0, le=1.0, description="Limiar de confiança para eventos informativos")
     
     # Configurações adicionais
-    ignore_areas: List[dict] = Field([], description="Áreas a serem ignoradas na detecção (polígonos)")
+    ignore_areas: List[DetectionZone] = Field([], description="Áreas a serem ignoradas na detecção (zonas onde a detecção é desativada)")
+    detection_zones: List[DetectionZone] = Field([], description="Zonas onde a detecção deve ser aplicada")
+    use_zones_only: bool = Field(False, description="Se verdadeiro, a detecção só ocorre nas zonas definidas")
     custom_rules: List[dict] = Field([], description="Regras personalizadas para detecção")
     
     @validator('yellow_confidence_threshold')
@@ -51,7 +66,9 @@ class DetectionSettingsUpdate(BaseModel):
     red_confidence_threshold: Optional[float] = Field(None, ge=0.0, le=1.0)
     yellow_confidence_threshold: Optional[float] = Field(None, ge=0.0, le=1.0)
     blue_confidence_threshold: Optional[float] = Field(None, ge=0.0, le=1.0)
-    ignore_areas: Optional[List[dict]] = None
+    ignore_areas: Optional[List[DetectionZone]] = None
+    detection_zones: Optional[List[DetectionZone]] = None
+    use_zones_only: Optional[bool] = None
     custom_rules: Optional[List[dict]] = None
 
 class DetectionSettingsInDB(DetectionSettingsBase):

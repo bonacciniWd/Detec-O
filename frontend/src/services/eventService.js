@@ -1,26 +1,24 @@
-import apiClient from './api';
+import api from './api';
 
 /**
- * Serviço para gerenciar eventos de detecção
+ * Serviço para gerenciar eventos do sistema
  */
 const eventService = {
   /**
-   * Obter a URL base da API
-   * @returns {string} URL base da API
+   * Obtém a lista de eventos com opções de filtragem e paginação
+   * @param {Object} options - Opções de consulta
+   * @param {number} options.limit - Quantidade de eventos a retornar
+   * @param {number} options.offset - Índice inicial para paginação
+   * @param {string} options.sort - Campo para ordenação (ex: '-timestamp' para decrescente por data)
+   * @param {string} options.type - Filtrar por tipo de evento
+   * @param {string} options.cameraId - Filtrar por ID da câmera
+   * @param {string} options.status - Filtrar por status (pending, confirmed, false_alarm)
+   * @returns {Promise<Array>} - Array de eventos
    */
-  getApiBaseUrl: () => {
-    return apiClient.defaults.baseURL;
-  },
-
-  /**
-   * Buscar eventos com filtros opcionais
-   * @param {Object} params - Parâmetros de filtro (dias, câmera, tipo, etc)
-   * @returns {Promise<Array>} Lista de eventos
-   */
-  getEvents: async (params = {}) => {
+  getEvents: async function(options = {}) {
     try {
-      const response = await apiClient.get('/api/v1/events', { params });
-      return response.data;
+      const response = await api.get('/v1/events', { params: options });
+      return response.data.items || response.data || [];
     } catch (error) {
       console.error('Erro ao buscar eventos:', error);
       throw error;
@@ -28,81 +26,66 @@ const eventService = {
   },
 
   /**
-   * Buscar detalhes de um evento específico
+   * Obtém os detalhes de um evento específico
    * @param {string} eventId - ID do evento
-   * @returns {Promise<Object>} Detalhes do evento
+   * @returns {Promise<Object>} - Dados do evento
    */
-  getEventDetails: async (eventId) => {
+  getEventById: async function(eventId) {
     try {
-      const response = await apiClient.get(`/api/v1/events/${eventId}`);
+      const response = await api.get(`/v1/events/${eventId}`);
       return response.data;
     } catch (error) {
-      console.error(`Erro ao buscar detalhes do evento ${eventId}:`, error);
+      console.error(`Erro ao buscar evento ${eventId}:`, error);
       throw error;
     }
   },
 
   /**
-   * Enviar feedback sobre um evento (verdadeiro positivo, falso positivo, etc)
+   * Atualiza o status de um evento
    * @param {string} eventId - ID do evento
-   * @param {string} feedback - Tipo de feedback ('true_positive', 'false_positive', 'uncertain')
-   * @returns {Promise<Object>} Resposta da API
+   * @param {string} status - Novo status (pending, confirmed, false_alarm)
+   * @param {string} comment - Comentário opcional sobre a atualização
+   * @returns {Promise<Object>} - Dados atualizados do evento
    */
-  submitFeedback: async (eventId, feedback) => {
+  updateEventStatus: async function(eventId, status, comment = '') {
     try {
-      const response = await apiClient.post(`/api/v1/events/${eventId}/feedback`, {
-        feedback_value: feedback
+      const response = await api.patch(`/v1/events/${eventId}`, { 
+        status,
+        comment
       });
       return response.data;
     } catch (error) {
-      console.error(`Erro ao enviar feedback para evento ${eventId}:`, error);
+      console.error(`Erro ao atualizar status do evento ${eventId}:`, error);
       throw error;
     }
   },
 
   /**
-   * Buscar estatísticas de eventos (contagens, distribuição, etc)
-   * @param {Object} params - Parâmetros de filtro para as estatísticas
-   * @returns {Promise<Object>} Estatísticas dos eventos
+   * Exclui um evento
+   * @param {string} eventId - ID do evento
+   * @returns {Promise<boolean>} - True se a exclusão foi bem-sucedida
    */
-  getEventStats: async (params = {}) => {
+  deleteEvent: async function(eventId) {
     try {
-      const response = await apiClient.get('/api/v1/events/stats', { params });
+      await api.delete(`/v1/events/${eventId}`);
+      return true;
+    } catch (error) {
+      console.error(`Erro ao excluir evento ${eventId}:`, error);
+      throw error;
+    }
+  },
+
+  /**
+   * Obtém resumo de estatísticas de eventos 
+   * @param {Object} options - Opções de filtragem (período, câmera, etc)
+   * @returns {Promise<Object>} - Estatísticas de eventos
+   */
+  getEventStats: async function(options = {}) {
+    try {
+      const response = await api.get('/v1/events/stats', { params: options });
       return response.data;
     } catch (error) {
       console.error('Erro ao buscar estatísticas de eventos:', error);
-      throw error;
-    }
-  },
-
-  /**
-   * Marcar um evento como lido/visualizado
-   * @param {string} eventId - ID do evento
-   * @returns {Promise<Object>} Resposta da API
-   */
-  markAsViewed: async (eventId) => {
-    try {
-      const response = await apiClient.post(`/api/v1/events/${eventId}/view`);
-      return response.data;
-    } catch (error) {
-      console.error(`Erro ao marcar evento ${eventId} como visualizado:`, error);
-      throw error;
-    }
-  },
-  
-  /**
-   * Baixar a imagem de um evento
-   * @param {string} eventId - ID do evento
-   * @returns {Promise<Blob>} Blob da imagem
-   */
-  downloadEventImage: async (eventId) => {
-    try {
-      const response = await apiClient.get(`/api/v1/events/${eventId}/image`, {
-        responseType: 'blob'
-      });
-      return response.data;
-    } catch (error) {
-      console.error(`Erro ao baixar imagem do evento ${eventId}:`, error);
       throw error;
     }
   }

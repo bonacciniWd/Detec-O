@@ -1,19 +1,18 @@
 import axios from 'axios';
 
-// Determine API URL based on environment
-const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:8080';
-
-const apiClient = axios.create({
-  baseURL: API_URL,
+// Criar instância do axios com configuração base
+const api = axios.create({
+  baseURL: '/api', // Base URL para todas as requisições
+  timeout: 10000, // Timeout de 10 segundos
   headers: {
-    'Content-Type': 'application/json',
-  },
+    'Content-Type': 'application/json'
+  }
 });
 
-// Request interceptor to add auth token
-apiClient.interceptors.request.use(
+// Interceptor para adicionar token em todas as requisições
+api.interceptors.request.use(
   (config) => {
-    const token = localStorage.getItem('authToken');
+    const token = localStorage.getItem('accessToken');
     if (token) {
       config.headers.Authorization = `Bearer ${token}`;
     }
@@ -24,56 +23,88 @@ apiClient.interceptors.request.use(
   }
 );
 
-// Response interceptor for error handling
-apiClient.interceptors.response.use(
+// Interceptor para tratar respostas de erro (401, 403, etc)
+api.interceptors.response.use(
   (response) => {
     return response;
   },
   async (error) => {
-    const originalRequest = error.config;
-
-    // If the error is due to an expired token and we haven't tried to refresh yet
-    if (error.response?.status === 401 && !originalRequest._retry) {
-      originalRequest._retry = true;
-
-      try {
-        // Try to refresh token
-        const refreshToken = localStorage.getItem('refreshToken');
-        
-        if (refreshToken) {
-          const response = await axios.post(`${API_URL}/auth/refresh`, {
-            refresh_token: refreshToken
-          });
-          
-          const { access_token } = response.data;
-          
-          // Update tokens in localStorage
-          localStorage.setItem('authToken', access_token);
-          
-          // Update the Authorization header
-          apiClient.defaults.headers.common['Authorization'] = `Bearer ${access_token}`;
-          originalRequest.headers['Authorization'] = `Bearer ${access_token}`;
-          
-          // Retry the original request
-          return apiClient(originalRequest);
-        }
-      } catch (refreshError) {
-        console.error('Error refreshing token:', refreshError);
-        
-        // Clear auth data on refresh failure
-        localStorage.removeItem('authToken');
+    // Implementação básica - pode ser expandida conforme necessário
+    if (error.response) {
+      // Se o erro for 401 (não autorizado), redirecionar para login
+      if (error.response.status === 401) {
+        console.log('Sessão expirada ou usuário não autenticado');
+        // Limpar token e redirecionar (pode ser implementado de forma mais sofisticada)
+        localStorage.removeItem('accessToken');
         localStorage.removeItem('refreshToken');
-        localStorage.removeItem('user_data');
-        
-        // Redirect to login (if window is available - client-side only)
-        if (typeof window !== 'undefined') {
-          window.location.href = '/login';
-        }
+        window.location.href = '/login';
+      }
+      
+      // Se for 403 (proibido), mostrar mensagem de acesso negado
+      if (error.response.status === 403) {
+        console.error('Acesso negado');
       }
     }
     
     return Promise.reject(error);
   }
 );
+
+// Métodos específicos para detecção
+const apiClient = {
+  // Método base para obter URL da API
+  getBaseUrl: () => {
+    return api.defaults.baseURL;
+  },
+  
+  // Obter configurações de detecção para uma câmera
+  getDetectionSettings: async (cameraId) => {
+    try {
+      const response = await api.get(`/v1/cameras/${cameraId}/settings`);
+      return response.data;
+    } catch (error) {
+      console.error('Erro ao obter configurações de detecção:', error);
+      throw error;
+    }
+  },
+  
+  // Salvar configurações de detecção para uma câmera
+  saveDetectionSettings: async (cameraId, settings) => {
+    try {
+      const response = await api.put(`/v1/cameras/${cameraId}/settings`, settings);
+      return response.data;
+    } catch (error) {
+      console.error('Erro ao salvar configurações de detecção:', error);
+      throw error;
+    }
+  },
+  
+  // Obter preview de uma câmera
+  getCameraPreview: (cameraId) => {
+    return `${api.defaults.baseURL}/v1/cameras/${cameraId}/preview`;
+  },
+  
+  // Exportar as zonas de detecção
+  exportDetectionZones: async (cameraId) => {
+    try {
+      const response = await api.get(`/v1/cameras/${cameraId}/detection-zones/export`);
+      return response.data;
+    } catch (error) {
+      console.error('Erro ao exportar zonas de detecção:', error);
+      throw error;
+    }
+  },
+  
+  // Importar zonas de detecção
+  importDetectionZones: async (cameraId, zonesData) => {
+    try {
+      const response = await api.post(`/v1/cameras/${cameraId}/detection-zones/import`, zonesData);
+      return response.data;
+    } catch (error) {
+      console.error('Erro ao importar zonas de detecção:', error);
+      throw error;
+    }
+  }
+};
 
 export default apiClient; 

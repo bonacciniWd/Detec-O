@@ -1,6 +1,13 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import apiClient from '../services/api';
 import { toast } from 'react-toastify';
+import { FaLock, FaUnlock, FaPersonWalking, FaCar, FaPlus, FaMinus } from 'react-icons/fa6';
+import DetectionZone from './DetectionZone';
+// Importar API mockada para desenvolvimento
+import mockApiClient from '../services/mock-api';
+
+// Escolher qual API usar com base no ambiente
+const client = process.env.NODE_ENV === 'development' ? mockApiClient : apiClient;
 
 /**
  * Componente de configurações avançadas para ajustar parâmetros 
@@ -14,12 +21,39 @@ const DetectionSettings = ({ cameraId }) => {
     detection_classes: ['person', 'car', 'animal'], // classes a detectar
     notifications_enabled: true,
     save_all_frames: false,
-    detection_zone: null // zona de detecção personalizada
+    detection_zone: null, // zona de detecção personalizada
+    detectionZones: []
   });
 
   const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
   const [advanced, setAdvanced] = useState(false);
+  // Detecta se é dispositivo móvel
+  const [isMobile, setIsMobile] = useState(false);
+  // Referências para os sliders
+  const confidenceSliderRef = useRef(null);
+  const motionSliderRef = useRef(null);
+  
+  const [cameraPreviewUrl, setCameraPreviewUrl] = useState('');
+  const [detectionZones, setDetectionZones] = useState([]);
+  
+  // Verificar se é dispositivo móvel na montagem
+  useEffect(() => {
+    const checkMobile = () => {
+      const mobile = window.matchMedia('(max-width: 768px)').matches;
+      setIsMobile(mobile);
+    };
+    
+    // Verificar inicialmente
+    checkMobile();
+    
+    // Verificar em redimensionamentos
+    window.addEventListener('resize', checkMobile);
+    
+    return () => {
+      window.removeEventListener('resize', checkMobile);
+    };
+  }, []);
   
   // Classes para detecção disponíveis
   const availableClasses = [
@@ -35,38 +69,49 @@ const DetectionSettings = ({ cameraId }) => {
 
   // Carregar configurações da câmera
   useEffect(() => {
-    const fetchSettings = async () => {
-      if (!cameraId) return;
-      
+    const loadSettings = async () => {
       setIsLoading(true);
+      setError(null);
+      
       try {
-        const response = await apiClient.get(`/api/v1/cameras/${cameraId}/settings`);
-        setSettings(prev => ({
-          ...prev,
-          ...response.data
-        }));
+        if (cameraId) {
+          // Usar cliente API escolhido com base no ambiente
+          const response = await client.getDetectionSettings(cameraId);
+          setSettings(response);
+          
+          // Carregar preview da câmera para usar com as zonas
+          setCameraPreviewUrl(client.getCameraPreview(cameraId));
+        }
       } catch (error) {
-        console.error('Erro ao carregar configurações de detecção:', error);
-        toast.error('Não foi possível carregar as configurações de detecção');
+        console.error('Erro ao carregar configurações:', error);
+        setError('Não foi possível carregar as configurações. Tente novamente.');
       } finally {
         setIsLoading(false);
       }
     };
-
-    fetchSettings();
+    
+    loadSettings();
   }, [cameraId]);
 
   // Salvar configurações
-  const saveSettings = async () => {
-    if (!cameraId) return;
-    
+  const handleSave = async () => {
     setIsSaving(true);
     try {
-      await apiClient.put(`/api/v1/cameras/${cameraId}/settings`, settings);
+      const updatedSettings = {
+        ...settings,
+        detectionZones // Incluir as zonas de detecção que foram modificadas
+      };
+      
+      // Salvar usando o cliente API escolhido
+      await client.saveDetectionSettings(cameraId, updatedSettings);
       toast.success('Configurações de detecção atualizadas com sucesso');
+      
+      if (onSave) {
+        onSave(updatedSettings);
+      }
     } catch (error) {
-      console.error('Erro ao salvar configurações de detecção:', error);
-      toast.error('Não foi possível salvar as configurações');
+      console.error('Erro ao salvar configurações:', error);
+      toast.error('Falha ao salvar configurações. Tente novamente.');
     } finally {
       setIsSaving(false);
     }
@@ -76,11 +121,20 @@ const DetectionSettings = ({ cameraId }) => {
   const handleChange = (e) => {
     const { name, value, type, checked } = e.target;
     
+    // Usar parseFloat para valores numéricos
+    const processedValue = type === 'checkbox' ? checked : 
+                          (type === 'number' || type === 'range') ? parseFloat(value) : value;
+    
+    // Atualiza o estado
     setSettings(prev => ({
       ...prev,
-      [name]: type === 'checkbox' ? checked : 
-              type === 'number' ? parseFloat(value) : value
+      [name]: processedValue
     }));
+    
+    // Log para debug em dispositivos móveis
+    if (isMobile) {
+      console.log(`${name} alterado para ${processedValue}`);
+    }
   };
   
   // Atualizar classes de detecção
@@ -100,6 +154,27 @@ const DetectionSettings = ({ cameraId }) => {
         };
       }
     });
+  };
+
+  // Tratamento especial para sliders em dispositivos móveis
+  const handleSliderTouchEnd = (e) => {
+    if (!isMobile) return;
+    
+    const { name, value } = e.target;
+    const numValue = parseFloat(value);
+    
+    // Força a atualização no fim do toque
+    setSettings(prev => ({
+      ...prev,
+      [name]: numValue
+    }));
+    
+    console.log(`Slider ${name} finalizado em ${numValue}`);
+  };
+
+  // Função para tratar mudanças nas zonas de detecção
+  const handleZonesChange = (zones) => {
+    setDetectionZones(zones);
   };
 
   // Classes reutilizáveis para tema escuro
@@ -148,6 +223,8 @@ const DetectionSettings = ({ cameraId }) => {
               step="0.05"
               value={settings.confidence_threshold}
               onChange={handleChange}
+              onTouchEnd={handleSliderTouchEnd}
+              ref={confidenceSliderRef}
               className={sliderClass}
               aria-describedby="confidence_help"
             />
@@ -174,6 +251,8 @@ const DetectionSettings = ({ cameraId }) => {
               step="0.1"
               value={settings.motion_sensitivity}
               onChange={handleChange}
+              onTouchEnd={handleSliderTouchEnd}
+              ref={motionSliderRef}
               className={sliderClass}
             />
             <span className="text-xs text-gray-400">Alta</span>
@@ -248,13 +327,13 @@ const DetectionSettings = ({ cameraId }) => {
             className="text-sm text-blue-400 hover:text-blue-300"
             onClick={() => setAdvanced(!advanced)}
           >
-            {advanced ? '- Ocultar configurações avançadas' : '+ Mostrar configurações avançadas'}
+            {advanced ? 'Ocultar configurações avançadas' : 'Mostrar configurações avançadas'}
           </button>
         </div>
         
         {/* Configurações Avançadas */}
         {advanced && (
-          <div className="pt-2 space-y-4 border-t border-gray-700">
+          <div className="space-y-4 pt-4 border-t border-gray-700">
             <div>
               <div className="flex items-center">
                 <input
@@ -266,41 +345,37 @@ const DetectionSettings = ({ cameraId }) => {
                   onChange={handleChange}
                 />
                 <label htmlFor="save_all_frames" className="ml-2 text-sm text-gray-300">
-                  Salvar todos os frames (utiliza mais armazenamento)
+                  Salvar todos os frames (consome mais espaço)
                 </label>
               </div>
             </div>
             
             <div>
-              <label className={labelClass}>
-                Zona de Detecção
-              </label>
-              <div className="mt-1 bg-gray-900 p-4 rounded text-center">
-                <p className="text-gray-400 text-sm">
-                  Configuração de zona de detecção deve ser feita diretamente no painel da câmera
-                </p>
-                <button
-                  type="button"
-                  className="mt-2 text-blue-400 hover:text-blue-300 text-sm"
-                  onClick={() => toast.info('Função de configuração de zona em desenvolvimento')}
-                >
-                  Configurar Zona de Detecção
-                </button>
+              <span className={labelClass}>Zona de Detecção</span>
+              <div className="bg-gray-700 p-4 rounded-md text-center">
+                <DetectionZone 
+                  imageUrl={cameraPreviewUrl}
+                  initialZones={settings.detectionZones || []}
+                  onChange={handleZonesChange}
+                  readOnly={isLoading}
+                />
               </div>
             </div>
           </div>
         )}
         
         {/* Botões de Ação */}
-        <div className="flex justify-end pt-4 border-t border-gray-700">
-          <button
-            type="button"
-            className={buttonClass}
-            onClick={saveSettings}
-            disabled={isSaving}
-          >
-            {isSaving ? 'Salvando...' : 'Salvar Configurações'}
-          </button>
+        <div className="pt-5 border-t border-gray-700">
+          <div className="flex justify-end">
+            <button
+              type="button"
+              className={buttonClass}
+              onClick={handleSave}
+              disabled={isSaving}
+            >
+              {isSaving ? 'Salvando...' : 'Salvar Configurações'}
+            </button>
+          </div>
         </div>
       </div>
     </div>

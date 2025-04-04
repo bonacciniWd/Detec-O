@@ -174,3 +174,167 @@ button,
 .h-content {
   height: fit-content;
 }
+
+/* Adicionando estilos para os componentes de câmera */
+
+/* Loader para representar carregamento */
+.loader {
+  border: 3px solid rgba(255, 255, 255, 0.3);
+  border-radius: 50%;
+  border-top: 3px solid #3498db;
+  width: 40px;
+  height: 40px;
+  animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+  0% { transform: rotate(0deg); }
+  100% { transform: rotate(360deg); }
+}
+
+/* Barra de carregamento para snapshot sendo atualizado */
+.loading-bar {
+  height: 2px;
+  background: linear-gradient(90deg, #3498db, #8e44ad);
+  animation: loading-progress 2s ease-in-out infinite;
+  width: 100%;
+}
+
+@keyframes loading-progress {
+  0% { transform: translateX(-100%); }
+  100% { transform: translateX(100%); }
+}
+
+/* Efeito de zoom suave para a página inicial */
+.animate-zoom {
+  animation: subtle-zoom 30s ease-in-out infinite alternate;
+}
+
+@keyframes subtle-zoom {
+  0% { transform: scale(1.0); }
+  100% { transform: scale(1.05); }
+}
+
+/* Transição suave para snapshots de câmera */
+.camera-snapshot img {
+  transition: filter 0.3s ease;
+}
+
+.camera-snapshot:hover img {
+  filter: brightness(1.1);
+}
+
+/* Grid responsivo para câmeras */
+.cameras-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+  gap: 1rem;
+}
+
+@media (max-width: 640px) {
+  .cameras-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+/* Estilos para indicadores de status */
+.status-indicator {
+  display: inline-block;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  margin-right: 8px;
+}
+
+.status-online {
+  background-color: #10b981; /* verde */
+  box-shadow: 0 0 0 2px rgba(16, 185, 129, 0.2);
+}
+
+.status-offline {
+  background-color: #ef4444; /* vermelho */
+}
+
+.status-warning {
+  background-color: #f59e0b; /* amarelo */
+}
+
+/* Animação de fade-in para conteúdo */
+.fade-in {
+  animation: fadeIn 0.5s ease-in;
+}
+
+@keyframes fadeIn {
+  0% { opacity: 0; }
+  100% { opacity: 1; }
+}
+
+/* Estilos globais para evitar scroll horizontal e melhorar questões de layout */
+html, body {
+  overflow-x: hidden;
+  max-width: 100vw;
+  min-height: 100vh;
+  padding: 0;
+  margin: 0;
+}
+
+body {
+  position: relative;
+}
+
+#root {
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+}
+
+/* Container principal para todas as páginas */
+.container {
+  width: 100%;
+  max-width: 100%;
+  overflow-x: hidden;
+  padding-bottom: 3rem; /* Espaço no final de todas as páginas */
+}
+
+/* Ajustes específicos para o dashboard */
+.dashboard-container, 
+.camera-container,
+.events-container {
+  width: 100%;
+  max-width: 100%;
+  overflow-x: hidden;
+  padding-bottom: 2rem;
+}
+
+/* Componente de zonas no dashboard */
+.zone-component {
+  max-width: 100%;
+  box-sizing: border-box;
+  overflow-x: hidden;
+}
+
+/* Ajustes para dispositivos móveis */
+@media (max-width: 768px) {
+  .container,
+  .dashboard-container,
+  .camera-container,
+  .events-container {
+    padding-bottom: 5rem; /* Espaço maior no mobile */
+  }
+  
+  .page-container {
+    padding-bottom: 6rem;
+    min-height: calc(100vh - 60px);
+  }
+  
+  /* Ajustes para formulários e cards em mobile */
+  .form-card, .data-card {
+    margin-bottom: 4rem;
+  }
+}
+
+/* Fix para o problema de visualização no modal de zonas */
+.zone-editor-modal {
+  max-width: 100vw;
+  overflow-x: hidden;
+}
