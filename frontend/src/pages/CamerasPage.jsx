@@ -60,10 +60,10 @@ function CamerasPage() {
     setDiscoveredDevices([]);
     
     try {
-      const response = await apiClient.get('/api/v1/devices/discover');
-      setDiscoveredDevices(response.data);
+      const result = await apiClient.discoverCameras();
+      setDiscoveredDevices(result);
       
-      if (response.data.length === 0) {
+      if (result.length === 0) {
         toast.info('Nenhum dispositivo encontrado na rede.');
       }
     } catch (error) {
@@ -403,7 +403,7 @@ function CamerasPage() {
                   <div className="w-full md:w-1/3 lg:w-1/4 bg-gray-200">
                     <div className="relative pt-[56.25%]"> {/* Aspect ratio 16:9 */}
                       <img 
-                        src={`${apiBaseUrl}/api/v1/devices/${camera.id}/cached-snapshot/1?max_age=60`} 
+                        src={`${apiBaseUrl}/v1/devices/${camera.id}/cached-snapshot/1?max_age=60`} 
                         alt={camera.name}
                         className="absolute inset-0 w-full h-full object-cover"
                         onError={(e) => {

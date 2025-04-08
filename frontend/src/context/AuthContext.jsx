@@ -36,7 +36,7 @@ export const AuthProvider = ({ children }) => {
             try {
               response = await axios.get(`${API_BASE}/auth/me`);
             } catch (e) {
-              response = await axios.get(`${API_BASE}/api/v1/auth/me`);
+              response = await axios.get(`${API_BASE}/v1/auth/me`);
             }
             
             setUser(response.data);
@@ -90,7 +90,7 @@ export const AuthProvider = ({ children }) => {
         console.log('Primeiro endpoint falhou, tentando alternativa', firstEndpointError);
         
         // Tentar segundo endpoint
-        response = await axios.post(`${API_BASE}/api/v1/auth/login`, { 
+        response = await axios.post(`${API_BASE}/v1/auth/login`, { 
           email, 
           password 
         });
@@ -131,7 +131,7 @@ export const AuthProvider = ({ children }) => {
           try {
             userResponse = await axios.get(`${API_BASE}/auth/me`);
           } catch (e) {
-            userResponse = await axios.get(`${API_BASE}/api/v1/auth/me`);
+            userResponse = await axios.get(`${API_BASE}/v1/auth/me`);
           }
           setUser(userResponse.data);
         } catch (userError) {
@@ -170,7 +170,7 @@ export const AuthProvider = ({ children }) => {
       try {
         response = await axios.post(`${API_BASE}/auth/register`, userData);
       } catch (e) {
-        response = await axios.post(`${API_BASE}/api/v1/auth/register`, userData);
+        response = await axios.post(`${API_BASE}/v1/auth/register`, userData);
       }
       
       // Após registro, tenta login automaticamente

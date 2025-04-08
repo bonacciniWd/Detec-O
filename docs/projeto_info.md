@@ -333,3 +333,12 @@ ssh root@detec-o.com.br "cp ~/Detec-O/backend/api_fixed.py ~/Detec-O/backend/api
 # Verificar status do serviço
 ssh root@detec-o.com.br "systemctl status deteco-api"
 ``` 
+
+## login user
+ssh denisbonaccini@detec-o.com.br
+
+## login root
+ssh root@detec-o.com.br
+
+
+

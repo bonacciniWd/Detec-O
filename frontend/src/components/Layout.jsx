@@ -104,13 +104,7 @@ function Layout({ children }) { // Aceitar children como prop
                 >
                   Dashboard
                 </Link>
-                <Link 
-                  to="/camera-dashboard" 
-                  className="block px-3 py-2 text-base font-medium text-gray-300 hover:bg-gray-700 hover:text-white"
-                  onClick={() => setMobileMenuOpen(false)}
-                >
-                  Minhas Câmeras
-                </Link>
+                
                 <Link 
                   to="/events" 
                   className="block px-3 py-2 text-base font-medium text-gray-300 hover:bg-gray-700 hover:text-white"

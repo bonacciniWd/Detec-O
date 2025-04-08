@@ -33,7 +33,7 @@ const CameraSnapshot = ({
       setUpdating(true);
       
       // Construir a URL com cache-busting
-      const url = `/api/devices/${deviceId}/cached-snapshot/${streamId}?quality=${quality}&t=${Date.now()}`;
+      const url = `/devices/${deviceId}/cached-snapshot/${streamId}?quality=${quality}&t=${Date.now()}`;
       
       const response = await axios.get(url, {
         headers: { Authorization: `Bearer ${token}` },

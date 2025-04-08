@@ -8,6 +8,30 @@ from typing import Dict, List, Optional, Any
 import uuid
 import random
 
+# Importação das rotas de detecção
+try:
+    from api_routes.detection_routes import router as detection_router
+except ImportError:
+    # Tratar a importação para quando o arquivo é executado diretamente
+    try:
+        # Relativos ao diretório atual
+        from backend.api_routes.detection_routes import router as detection_router
+    except ImportError:
+        print("Aviso: Módulo de rotas de detecção não encontrado. Algumas funcionalidades podem estar indisponíveis.")
+        detection_router = None
+
+# Importação das rotas de dispositivos
+try:
+    from api_routes.devices_routes import router as devices_router
+except ImportError:
+    # Tratar a importação para quando o arquivo é executado diretamente
+    try:
+        # Relativos ao diretório atual
+        from backend.api_routes.devices_routes import router as devices_router
+    except ImportError:
+        print("Aviso: Módulo de rotas de dispositivos não encontrado. Algumas funcionalidades podem estar indisponíveis.")
+        devices_router = None
+
 app = FastAPI(
     title="Detec-o API",
     description="API para sistema de detecção por câmera",
@@ -50,6 +74,41 @@ USER_DB.append({
     "created_at": datetime.now(),
     "updated_at": datetime.now()
 })
+
+# Criar algumas câmeras de exemplo para o admin
+for i in range(3):
+    camera_id = str(uuid.uuid4())
+    CAMERA_DB.append({
+        "id": camera_id,
+        "user_id": admin_id,  # Associar ao admin
+        "name": f"Câmera {i+1}",
+        "ip": f"192.168.1.{i+100}",
+        "status": "online" if i < 2 else "offline",
+        "model": "Hikvision DS-2CD2385G1-I",
+        "location": f"Local {i+1}",
+        "created_at": datetime.now(),
+        "updated_at": datetime.now()
+    })
+
+# Criar eventos de exemplo para o admin
+for i in range(10):
+    event_id = str(uuid.uuid4())
+    event_type = random.choice(["person", "vehicle", "animal", "face"])
+    timestamp = datetime.now() - timedelta(hours=i*3)
+    
+    EVENTS_DB.append({
+        "id": event_id,
+        "user_id": admin_id,  # Associar ao admin
+        "camera_id": CAMERA_DB[i % len(CAMERA_DB)]["id"],  # Distribuir entre as câmeras
+        "type": event_type,
+        "severity": random.choice(["low", "medium", "high"]),
+        "confidence": round(random.uniform(0.7, 0.98), 2),
+        "timestamp": timestamp,
+        "image_url": f"/images/events/{event_id}.jpg",
+        "status": random.choice(["new", "reviewed", "archived"]),
+        "created_at": timestamp,
+        "updated_at": timestamp
+    })
 
 # Funções de autenticação
 def verify_password(plain_password: str, hashed_password: str) -> bool:
@@ -178,10 +237,24 @@ async def register(user_data: Dict = Body(...)):
     }
 
 @app.post("/auth/token", tags=["auth"])
-async def login(form_data: OAuth2PasswordRequestForm = Depends()):
+async def login(
+    form_data: OAuth2PasswordRequestForm = Depends(),
+    user_credentials: Dict = Body(None)
+):
     """Endpoint de login para obter token JWT."""
+    # Determinar se estamos usando form_data ou JSON
+    email = None
+    password = None
+    
+    if user_credentials:
+        email = user_credentials.get("email") or user_credentials.get("username")
+        password = user_credentials.get("password")
+    else:
+        email = form_data.username
+        password = form_data.password
+    
     # Autenticar usuário
-    user = authenticate_user(form_data.username, form_data.password)
+    user = authenticate_user(email, password)
     
     if not user:
         raise HTTPException(
@@ -201,6 +274,14 @@ async def login(form_data: OAuth2PasswordRequestForm = Depends()):
         "expires_in": 60 * 60 * 24,  # 24 horas em segundos
         "refresh_token": refresh_token
     }
+
+@app.post("/api/v1/auth/login", tags=["auth"])
+async def alternative_login(
+    form_data: OAuth2PasswordRequestForm = Depends(),
+    user_credentials: Dict = Body(None)
+):
+    """Endpoint alternativo de login para compatibilidade."""
+    return await login(form_data, user_credentials)
 
 @app.post("/auth/refresh", tags=["auth"])
 async def refresh_token(refresh_token: str = Body(..., embed=True)):
@@ -232,14 +313,19 @@ async def refresh_token(refresh_token: str = Body(..., embed=True)):
 
 @app.get("/auth/me", tags=["auth"])
 async def read_users_me(current_user: Dict[str, Any] = Depends(get_current_user)):
-    """Retorna informações do usuário autenticado."""
+    """Endpoint para obter informações do usuário atual."""
     return {
         "id": current_user["id"],
-        "email": current_user["email"],
         "name": current_user["name"],
-        "is_active": current_user["is_active"],
-        "created_at": current_user["created_at"]
+        "email": current_user["email"],
+        "created_at": current_user["created_at"],
+        "updated_at": current_user["updated_at"]
     }
+
+@app.get("/api/v1/auth/me", tags=["auth"])
+async def read_users_me_alt(current_user: Dict[str, Any] = Depends(get_current_user)):
+    """Endpoint alternativo para obter informações do usuário atual."""
+    return await read_users_me(current_user)
 
 # Rotas para câmeras
 @app.get("/api/v1/cameras", tags=["cameras"])
@@ -249,7 +335,7 @@ async def list_cameras(
     search: Optional[str] = Query(None, description="Termo de busca para nome ou localização"),
     current_user: dict = Depends(get_current_user)
 ):
-    """Lista todas as câmeras do usuário atual."""
+    """Endpoint para listar câmeras com paginação e busca."""
     # Filtrar câmeras do usuário atual
     user_cameras = [cam for cam in CAMERA_DB if cam["user_id"] == current_user["id"]]
     
@@ -420,6 +506,16 @@ async def delete_camera(
     
     return
 
+@app.get("/api/api/v1/cameras", tags=["cameras"])
+async def list_cameras_duplicate_prefix(
+    page: int = Query(1, ge=1, description="Página atual"),
+    limit: int = Query(10, ge=1, le=100, description="Itens por página"),
+    search: Optional[str] = Query(None, description="Termo de busca para nome ou localização"),
+    current_user: dict = Depends(get_current_user)
+):
+    """Endpoint para lidar com baseURL incorreta do frontend (api duplicado)."""
+    return await list_cameras(page, limit, search, current_user)
+
 # Rotas para eventos
 def generate_sample_events(user_id, camera_id=None, num_events=5):
     """Gera eventos de amostra para demonstração."""
@@ -481,7 +577,7 @@ async def list_events(
     severity: Optional[str] = Query(None, description="Filtrar por severidade (red, yellow, blue)"),
     current_user: dict = Depends(get_current_user)
 ):
-    """Lista eventos de detecção com opções de filtro e paginação."""
+    """Endpoint para listar eventos com paginação e filtros."""
     # Gerar eventos de exemplo se o banco estiver vazio
     if not EVENTS_DB:
         sample_events = generate_sample_events(current_user["id"])
@@ -700,6 +796,26 @@ async def update_detection_settings(
         SETTINGS_DB.append(new_settings)
         
         return new_settings
+
+@app.get("/api/api/v1/events", tags=["events"])
+async def list_events_duplicate_prefix(
+    page: int = Query(1, ge=1, description="Página atual"),
+    limit: int = Query(10, ge=1, le=100, description="Itens por página"),
+    days: int = Query(7, ge=1, le=90, description="Últimos N dias"),
+    camera_id: Optional[str] = Query(None, description="Filtrar por ID da câmera"),
+    severity: Optional[str] = Query(None, description="Filtrar por severidade (red, yellow, blue)"),
+    current_user: dict = Depends(get_current_user)
+):
+    """Endpoint para lidar com baseURL incorreta do frontend (api duplicado)."""
+    return await list_events(page, limit, days, camera_id, severity, current_user)
+
+# Adicionar esta linha logo após a criação do app FastAPI, junto com outros app.add_middleware ou app.include_router
+if detection_router:
+    app.include_router(detection_router)
+
+# Incluir router de dispositivos
+if devices_router:
+    app.include_router(devices_router)
 
 # Iniciar servidor se executado diretamente
 if __name__ == "__main__":

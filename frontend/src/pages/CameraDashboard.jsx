@@ -1,11 +1,11 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
-import MainLayout from '../components/MainLayout';
 import CameraSnapshot from '../components/CameraSnapshot';
 import StreamModal from '../components/StreamModal';
-import { FaPlus, FaSearch, FaSync, FaList, FaThLarge } from 'react-icons/fa';
-import axios from 'axios';
+import { FaPlus, FaSearch, FaSync, FaList, FaThLarge, FaCog, FaTrash, FaPen } from 'react-icons/fa';
+import apiClient from '../services/api';
+import { toast } from 'react-toastify';
 
 const CameraDashboard = () => {
   const { token } = useAuth();
@@ -26,19 +26,23 @@ const CameraDashboard = () => {
     cameraName: ''
   });
 
+  // Estado para confirmação de exclusão
+  const [deleteConfirmation, setDeleteConfirmation] = useState({
+    isOpen: false,
+    deviceId: null,
+    deviceName: ''
+  });
+
   // Buscar dispositivos/câmeras do usuário
   useEffect(() => {
     const fetchDevices = async () => {
       try {
         setLoading(true);
         
-        const response = await axios.get('/api/devices', {
-          headers: {
-            'Authorization': `Bearer ${token}`
-          }
-        });
+        // Usar o método específico para obter lista de dispositivos
+        const devices = await apiClient.getDevices();
         
-        setDevices(response.data);
+        setDevices(devices);
         setLoading(false);
       } catch (err) {
         console.error('Erro ao buscar dispositivos:', err);
@@ -48,7 +52,7 @@ const CameraDashboard = () => {
     };
     
     fetchDevices();
-  }, [token]);
+  }, []);
 
   // Buscar streams para cada dispositivo
   useEffect(() => {
@@ -57,13 +61,10 @@ const CameraDashboard = () => {
       
       for (const device of devices) {
         try {
-          const response = await axios.get(`/api/devices/${device.id}/streams`, {
-            headers: {
-              'Authorization': `Bearer ${token}`
-            }
-          });
+          // Usar o método específico para obter streams de dispositivos
+          const streams = await apiClient.getDeviceStreams(device.id);
           
-          streamsMap[device.id] = response.data;
+          streamsMap[device.id] = streams;
         } catch (err) {
           console.error(`Erro ao buscar streams para dispositivo ${device.id}:`, err);
           streamsMap[device.id] = [];
@@ -76,7 +77,7 @@ const CameraDashboard = () => {
     if (devices.length > 0) {
       fetchStreams();
     }
-  }, [devices, token]);
+  }, [devices]);
 
   // Filtrar dispositivos com base na pesquisa
   const filteredDevices = Array.isArray(devices) ? devices.filter(device => 
@@ -111,6 +112,42 @@ const CameraDashboard = () => {
     // Você pode atualizar o status do dispositivo ou mostrar uma notificação aqui
   };
 
+  // Manipular exclusão de câmera
+  const handleDeleteCamera = async (deviceId, deviceName) => {
+    // Abrir modal de confirmação
+    setDeleteConfirmation({
+      isOpen: true,
+      deviceId,
+      deviceName
+    });
+  };
+
+  // Confirmar exclusão de câmera
+  const confirmDeleteCamera = async () => {
+    try {
+      await apiClient.deleteDevice(deleteConfirmation.deviceId);
+      toast.success(`Câmera "${deleteConfirmation.deviceName}" excluída com sucesso`);
+      
+      // Atualizar a lista de dispositivos removendo o excluído
+      setDevices(devices.filter(device => device.id !== deleteConfirmation.deviceId));
+      
+      // Fechar o modal de confirmação
+      setDeleteConfirmation({
+        isOpen: false,
+        deviceId: null,
+        deviceName: ''
+      });
+    } catch (error) {
+      console.error('Erro ao excluir câmera:', error);
+      toast.error('Falha ao excluir câmera. Tente novamente.');
+    }
+  };
+
+  // Manipular edição de câmera
+  const handleEditCamera = (deviceId) => {
+    navigate(`/camera/${deviceId}`);
+  };
+
   // Renderizar lista de câmeras
   const renderCameras = () => {
     if (loading) {
@@ -127,7 +164,7 @@ const CameraDashboard = () => {
           <p className="text-red-500 mb-4">{error}</p>
           <button 
             onClick={() => window.location.reload()} 
-            className="px-4 py-2 bg-blue-500 text-white rounded hover:bg-blue-600"
+            className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700"
           >
             Tentar novamente
           </button>
@@ -139,17 +176,17 @@ const CameraDashboard = () => {
       if (searchTerm) {
         return (
           <div className="text-center py-8">
-            <p className="text-gray-500">Nenhum dispositivo encontrado para "{searchTerm}".</p>
+            <p className="text-gray-400">Nenhum dispositivo encontrado para "{searchTerm}".</p>
           </div>
         );
       }
       
       return (
         <div className="text-center py-8">
-          <p className="text-gray-500 mb-4">Você ainda não tem dispositivos configurados.</p>
+          <p className="text-gray-400 mb-4">Você ainda não tem dispositivos configurados.</p>
           <button 
             onClick={() => navigate('/add-camera')} 
-            className="px-4 py-2 bg-blue-500 text-white rounded hover:bg-blue-600 flex items-center justify-center mx-auto"
+            className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 flex items-center justify-center mx-auto"
           >
             <FaPlus className="mr-2" />
             Adicionar Câmera
@@ -171,17 +208,33 @@ const CameraDashboard = () => {
             return (
               <div 
                 key={device.id} 
-                className="bg-white rounded-lg shadow overflow-hidden border border-gray-200"
+                className="bg-gray-800 rounded-lg shadow overflow-hidden border border-gray-700 text-gray-200"
               >
                 <div className="p-4">
                   <div className="flex items-center justify-between mb-2">
                     <h3 className="text-lg font-medium">{device.name}</h3>
-                    <span className={`status-indicator ${device.status === 'online' ? 'status-online' : 'status-offline'}`}></span>
+                    <div className="flex items-center space-x-2">
+                      <span className={`status-indicator ${device.status === 'online' ? 'status-online' : 'status-offline'}`}></span>
+                      <button 
+                        onClick={() => handleEditCamera(device.id)}
+                        className="p-1 text-gray-400 hover:text-blue-400"
+                        title="Editar câmera"
+                      >
+                        <FaPen size={14} />
+                      </button>
+                      <button 
+                        onClick={() => handleDeleteCamera(device.id, device.name)}
+                        className="p-1 text-gray-400 hover:text-red-400"
+                        title="Excluir câmera"
+                      >
+                        <FaTrash size={14} />
+                      </button>
+                    </div>
                   </div>
-                  <p className="text-sm text-gray-500">{device.manufacturer} {device.model}</p>
-                  <p className="text-xs text-gray-400">{device.ip_address}</p>
-                  <div className="mt-4 p-8 bg-gray-100 rounded flex items-center justify-center">
-                    <p className="text-gray-500">Nenhum stream disponível</p>
+                  <p className="text-sm text-gray-400">{device.manufacturer} {device.model}</p>
+                  <p className="text-xs text-gray-500">{device.ip_address}</p>
+                  <div className="mt-4 p-8 bg-gray-700 rounded flex items-center justify-center">
+                    <p className="text-gray-400">Nenhum stream disponível</p>
                   </div>
                 </div>
               </div>
@@ -192,19 +245,39 @@ const CameraDashboard = () => {
           return (
             <div 
               key={device.id} 
-              className="bg-white rounded-lg shadow overflow-hidden border border-gray-200"
+              className="bg-gray-800 rounded-lg shadow overflow-hidden border border-gray-700 text-gray-200"
             >
               {viewMode === 'grid' ? (
-                <CameraSnapshot 
-                  deviceId={device.id}
-                  streamId={primaryStream.id}
-                  cameraName={device.name}
-                  interval={refreshInterval}
-                  onExpand={handleCameraExpand}
-                  onError={handleCameraError}
-                  showControls={true}
-                  autoRefresh={true}
-                />
+                <>
+                  <div className="relative">
+                    <CameraSnapshot 
+                      deviceId={device.id}
+                      streamId={primaryStream.id}
+                      cameraName={device.name}
+                      interval={refreshInterval}
+                      onExpand={handleCameraExpand}
+                      onError={handleCameraError}
+                      showControls={true}
+                      autoRefresh={true}
+                    />
+                    <div className="absolute top-2 right-2 flex space-x-1">
+                      <button 
+                        onClick={() => handleEditCamera(device.id)}
+                        className="p-1 bg-gray-900 bg-opacity-70 text-white rounded hover:bg-opacity-90"
+                        title="Editar câmera"
+                      >
+                        <FaPen size={12} />
+                      </button>
+                      <button 
+                        onClick={() => handleDeleteCamera(device.id, device.name)}
+                        className="p-1 bg-gray-900 bg-opacity-70 text-white rounded hover:bg-opacity-90"
+                        title="Excluir câmera"
+                      >
+                        <FaTrash size={12} />
+                      </button>
+                    </div>
+                  </div>
+                </>
               ) : (
                 <div className="flex">
                   <div className="w-48">
@@ -222,21 +295,37 @@ const CameraDashboard = () => {
                   <div className="p-4 flex-1">
                     <div className="flex items-center justify-between mb-2">
                       <h3 className="text-lg font-medium">{device.name}</h3>
-                      <span className={`status-indicator ${device.status === 'online' ? 'status-online' : 'status-offline'}`}></span>
+                      <div className="flex items-center space-x-2">
+                        <span className={`status-indicator ${device.status === 'online' ? 'status-online' : 'status-offline'}`}></span>
+                        <button 
+                          onClick={() => handleEditCamera(device.id)}
+                          className="p-1 text-gray-400 hover:text-blue-400"
+                          title="Editar câmera"
+                        >
+                          <FaPen size={14} />
+                        </button>
+                        <button 
+                          onClick={() => handleDeleteCamera(device.id, device.name)}
+                          className="p-1 text-gray-400 hover:text-red-400"
+                          title="Excluir câmera"
+                        >
+                          <FaTrash size={14} />
+                        </button>
+                      </div>
                     </div>
-                    <p className="text-sm text-gray-500">{device.manufacturer} {device.model}</p>
-                    <p className="text-xs text-gray-400">{device.ip_address}</p>
+                    <p className="text-sm text-gray-400">{device.manufacturer} {device.model}</p>
+                    <p className="text-xs text-gray-500">{device.ip_address}</p>
                     <div className="mt-2 flex">
                       <button 
                         onClick={() => handleCameraExpand(device.id, primaryStream.id, device.name)}
-                        className="text-xs text-blue-500 hover:underline"
+                        className="text-xs text-blue-400 hover:underline"
                       >
                         Ver Stream
                       </button>
-                      <span className="mx-2 text-gray-300">|</span>
+                      <span className="mx-2 text-gray-600">|</span>
                       <button 
                         onClick={() => navigate(`/camera/${device.id}`)}
-                        className="text-xs text-blue-500 hover:underline"
+                        className="text-xs text-blue-400 hover:underline"
                       >
                         Configurações
                       </button>
@@ -252,48 +341,46 @@ const CameraDashboard = () => {
   };
 
   return (
-    <MainLayout>
-      <div className="container mx-auto px-2 sm:px-4 py-4 sm:py-6">
-        <div className="flex flex-col md:flex-row md:items-center justify-between mb-4 md:mb-6">
-          <div className="flex flex-col sm:flex-row gap-3">
+    <div className="bg-gray-900 text-gray-200 min-h-screen">
+      <div className="container mx-auto px-4 py-6">
+        {/* Cabeçalho */}
+        <div className="flex flex-col md:flex-row md:items-center justify-between mb-6">
+          
+          
+          <div className="flex flex-col md:flex-row space-y-2 md:space-y-0 md:space-x-4">
             {/* Barra de pesquisa */}
-            <div className="relative w-full sm:w-auto">
+            <div className="relative">
               <input
                 type="text"
                 placeholder="Buscar câmeras..."
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
-                className="pl-10 pr-4 py-2 border rounded-lg w-full focus:outline-none focus:ring-2 focus:ring-blue-500"
+                className="pl-10 pr-4 py-2 bg-gray-800 border border-gray-700 rounded-lg text-gray-200 w-full md:w-52 focus:outline-none focus:border-blue-500"
               />
               <FaSearch className="absolute left-3 top-3 text-gray-400" />
             </div>
             
-            {/* Controles de visualização */}
+            {/* Botões de ação */}
             <div className="flex space-x-2">
-              <button
-                onClick={() => setViewMode('grid')}
-                className={`p-2 rounded ${viewMode === 'grid' ? 'bg-blue-500 text-white' : 'bg-gray-200 text-gray-600'}`}
-                title="Visualização em grade"
+              <button 
+                onClick={() => setViewMode(viewMode === 'grid' ? 'list' : 'grid')}
+                className="p-2 bg-gray-800 text-gray-300 rounded-lg hover:bg-gray-700"
+                title={viewMode === 'grid' ? 'Ver como lista' : 'Ver como grade'}
               >
-                <FaThLarge />
+                {viewMode === 'grid' ? <FaList /> : <FaThLarge />}
               </button>
-              <button
-                onClick={() => setViewMode('list')}
-                className={`p-2 rounded ${viewMode === 'list' ? 'bg-blue-500 text-white' : 'bg-gray-200 text-gray-600'}`}
-                title="Visualização em lista"
-              >
-                <FaList />
-              </button>
-              <button
+              
+              <button 
                 onClick={() => window.location.reload()}
-                className="p-2 rounded bg-gray-200 text-gray-600 hover:bg-gray-300"
+                className="p-2 bg-gray-800 text-gray-300 rounded-lg hover:bg-gray-700"
                 title="Atualizar"
               >
                 <FaSync />
               </button>
-              <button
+              
+              <button 
                 onClick={() => navigate('/add-camera')}
-                className="p-2 rounded bg-blue-500 text-white hover:bg-blue-600"
+                className="p-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700"
                 title="Adicionar câmera"
               >
                 <FaPlus />
@@ -301,38 +388,69 @@ const CameraDashboard = () => {
             </div>
           </div>
         </div>
-        
+
         {/* Controle de intervalo de atualização */}
-        <div className="mb-4 sm:mb-6">
-          <label className="flex items-center text-sm text-gray-600">
-            <span className="mr-3">Intervalo de atualização:</span>
-            <select 
-              value={refreshInterval} 
-              onChange={(e) => setRefreshInterval(Number(e.target.value))}
-              className="border rounded p-1"
-            >
-              <option value={2000}>2 segundos</option>
-              <option value={5000}>5 segundos</option>
-              <option value={10000}>10 segundos</option>
-              <option value={30000}>30 segundos</option>
-              <option value={60000}>1 minuto</option>
-            </select>
+        <div className="mb-6 bg-gray-900 p-4 rounded-lg border border-gray-800">
+          <label className="text-sm text-gray-400 mb-2 block">
+            Intervalo de atualização: {refreshInterval/1000}s
           </label>
+          <input
+            type="range"
+            min="1000"
+            max="60000"
+            step="1000"
+            value={refreshInterval}
+            onChange={(e) => setRefreshInterval(parseInt(e.target.value))}
+            className="w-full accent-blue-600"
+          />
+          <div className="flex justify-between text-xs text-gray-500">
+            <span>1s</span>
+            <span>30s</span>
+            <span>60s</span>
+          </div>
         </div>
         
-        {/* Grid/Lista de câmeras */}
+        {/* Lista de câmeras */}
         {renderCameras()}
       </div>
       
-      {/* Modal para exibir stream */}
-      <StreamModal 
-        isOpen={streamModal.isOpen}
-        onClose={closeStreamModal}
-        deviceId={streamModal.deviceId}
-        streamId={streamModal.streamId}
-        cameraName={streamModal.cameraName}
-      />
-    </MainLayout>
+      {/* Modal de stream */}
+      {streamModal.isOpen && (
+        <StreamModal
+          deviceId={streamModal.deviceId}
+          streamId={streamModal.streamId}
+          cameraName={streamModal.cameraName}
+          onClose={closeStreamModal}
+        />
+      )}
+
+      {/* Modal de confirmação de exclusão */}
+      {deleteConfirmation.isOpen && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+          <div className="bg-gray-800 rounded-lg p-6 max-w-md w-full">
+            <h3 className="text-xl font-semibold mb-4">Confirmar exclusão</h3>
+            <p className="mb-6">
+              Tem certeza que deseja excluir a câmera "{deleteConfirmation.deviceName}"? 
+              Esta ação não pode ser desfeita.
+            </p>
+            <div className="flex justify-end space-x-3">
+              <button 
+                className="px-4 py-2 bg-gray-700 text-white rounded hover:bg-gray-600"
+                onClick={() => setDeleteConfirmation({isOpen: false, deviceId: null, deviceName: ''})}
+              >
+                Cancelar
+              </button>
+              <button 
+                className="px-4 py-2 bg-red-600 text-white rounded hover:bg-red-700"
+                onClick={confirmDeleteCamera}
+              >
+                Excluir
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
   );
 };
 

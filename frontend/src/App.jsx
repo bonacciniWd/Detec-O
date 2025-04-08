@@ -1,10 +1,9 @@
 import React, { useEffect } from 'react';
-import { BrowserRouter, Routes, Route, Navigate, useLocation } from 'react-router-dom';
+import { Routes, Route, Navigate, useLocation } from 'react-router-dom';
 import { useAuth } from './context/AuthContext';
 import { ToastContainer } from 'react-toastify';
 import 'react-toastify/dist/ReactToastify.css';
-import { AuthProvider } from './contexts/AuthContext';
-import './styles/global.css';
+import './App.css';
 
 // Pages
 import LoginPage from './pages/LoginPage';
@@ -85,99 +84,94 @@ function App() {
   }, []);
 
   return (
-    <BrowserRouter>
-      <AuthProvider>
-        <ScrollToTop />
-        <div id="main-content">
-          <Routes>
-            {/* Rota pública para a landing page */}
-            <Route path="/" element={<LandingPage />} />
-            
-            {/* Rotas públicas */}
-            <Route path="/login" element={<LoginPage />} />
-            <Route path="/register" element={<RegisterPage />} />
-            
-            {/* Rotas protegidas */}
-            <Route path="/dashboard" element={
-              <ProtectedRoute>
-                <MainLayout>
-                  <DashboardPage />
-                </MainLayout>
-              </ProtectedRoute>
-            } />
-            
-            {/* Rota para visualização de câmeras em grade */}
-            <Route path="/cameras" element={
-              <ProtectedRoute>
-                <CameraDashboard />
-              </ProtectedRoute>
-            } />
-            
-            {/* Rota alternativa para câmeras */}
-            <Route path="/camera-dashboard" element={
-              <ProtectedRoute>
-                <CameraDashboard />
-              </ProtectedRoute>
-            } />
-            
-            <Route path="/events" element={
-              <ProtectedRoute>
-                <MainLayout>
-                  <EventsPage />
-                </MainLayout>
-              </ProtectedRoute>
-            } />
-            
-            <Route path="/events/:id" element={
-              <ProtectedRoute>
-                <MainLayout>
-                  <EventDetail />
-                </MainLayout>
-              </ProtectedRoute>
-            } />
-            
-            <Route path="/settings" element={
-              <ProtectedRoute>
-                <MainLayout>
-                  <SettingsPage />
-                </MainLayout>
-              </ProtectedRoute>
-            } />
-            
-            <Route path="/camera/:id" element={
-              <ProtectedRoute>
-                <MainLayout>
-                  <CameraSettings />
-                </MainLayout>
-              </ProtectedRoute>
-            } />
-            
-            {/* Rota para adicionar câmera */}
-            <Route path="/add-camera" element={
-              <ProtectedRoute>
-                <AddCameraPage />
-              </ProtectedRoute>
-            } />
-            
-            {/* Rota de fallback */}
-            <Route path="*" element={<NotFoundPage />} />
-          </Routes>
+    <>
+      <ScrollToTop />
+      <div id="main-content">
+        <Routes>
+          {/* Rota pública para a landing page */}
+          <Route path="/" element={<LandingPage />} />
           
-          <ToastContainer 
-            position="top-right"
-            autoClose={5000}
-            hideProgressBar={false}
-            newestOnTop
-            closeOnClick
-            rtl={false}
-            pauseOnFocusLoss
-            draggable
-            pauseOnHover
-            theme="dark"
-          />
-        </div>
-      </AuthProvider>
-    </BrowserRouter>
+          {/* Rotas públicas */}
+          <Route path="/login" element={<LoginPage />} />
+          <Route path="/register" element={<RegisterPage />} />
+          
+          {/* Rotas protegidas */}
+          <Route path="/dashboard" element={
+            <ProtectedRoute>
+              <MainLayout>
+                <DashboardPage />
+              </MainLayout>
+            </ProtectedRoute>
+          } />
+          
+          {/* Rota para visualização de câmeras em grade */}
+          <Route path="/cameras" element={
+            <ProtectedRoute>
+              <MainLayout>
+                <CameraDashboard />
+              </MainLayout>
+            </ProtectedRoute>
+          } />
+          
+          <Route path="/events" element={
+            <ProtectedRoute>
+              <MainLayout>
+                <EventsPage />
+              </MainLayout>
+            </ProtectedRoute>
+          } />
+          
+          <Route path="/events/:id" element={
+            <ProtectedRoute>
+              <MainLayout>
+                <EventDetail />
+              </MainLayout>
+            </ProtectedRoute>
+          } />
+          
+          <Route path="/settings" element={
+            <ProtectedRoute>
+              <MainLayout>
+                <SettingsPage />
+              </MainLayout>
+            </ProtectedRoute>
+          } />
+          
+          <Route path="/camera/:id" element={
+            <ProtectedRoute>
+              <MainLayout>
+                <CameraSettings />
+              </MainLayout>
+            </ProtectedRoute>
+          } />
+          
+          {/* Rota para adicionar câmera */}
+          <Route path="/add-camera" element={
+            <ProtectedRoute>
+              <MainLayout>
+                <AddCameraPage />
+              </MainLayout>
+            </ProtectedRoute>
+          } />
+          
+          {/* Rota de fallback */}
+          <Route path="*" element={<NotFoundPage />} />
+        </Routes>
+        
+        <ToastContainer 
+          position="top-right"
+          autoClose={5000}
+          hideProgressBar={false}
+          newestOnTop
+          closeOnClick
+          rtl={false}
+          pauseOnFocusLoss
+          draggable
+          pauseOnHover
+          theme="dark"
+        />
+      </div>
+    </>
   );
 }
 

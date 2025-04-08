@@ -10,42 +10,36 @@ import { toast } from 'react-toastify';
 const FeedbackControl = ({ eventId, initialValue = null, onFeedbackSubmit = null, size = "normal" }) => {
   const [feedback, setFeedback] = useState(initialValue);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [isPositive, setIsPositive] = useState(initialValue === 'true_positive');
+  const [notes, setNotes] = useState('');
 
   // Classes CSS baseadas no tamanho
   const btnSize = size === "small" ? "p-1 text-xs" : "p-2 text-sm";
   const containerClass = size === "small" ? "flex space-x-1" : "flex space-x-2";
 
-  // Enviar feedback para o backend
-  const submitFeedback = async (value) => {
-    // Se clicar no mesmo valor já selecionado, desmarca
-    if (feedback === value) {
-      value = null;
-    }
-
-    setIsSubmitting(true);
+  // Enviar feedback
+  const submitFeedback = async (isPositive) => {
     try {
-      await apiClient.post(`/api/v1/events/${eventId}/feedback`, {
-        feedback_value: value
+      setIsSubmitting(true);
+      
+      // Enviar para a API
+      await apiClient.post(`/v1/events/${eventId}/feedback`, {
+        is_positive: isPositive,
+        notes: notes
       });
       
-      setFeedback(value);
+      // Atualizar estado e notificar
+      setFeedbackSubmitted(true);
+      setIsPositive(isPositive);
+      toast.success(`Feedback ${isPositive ? 'positivo' : 'negativo'} enviado com sucesso!`);
       
-      // Mostrar notificação de sucesso
-      const messages = {
-        'true_positive': 'Marcado como verdadeiro positivo',
-        'false_positive': 'Marcado como falso positivo',
-        'uncertain': 'Marcado como incerto',
-        null: 'Feedback removido'
-      };
-      toast.success(messages[value] || 'Feedback atualizado');
-      
-      // Notificar o componente pai se necessário
+      // Notificar componente pai
       if (onFeedbackSubmit) {
-        onFeedbackSubmit(value);
+        onFeedbackSubmit(isPositive, notes);
       }
     } catch (error) {
       console.error('Erro ao enviar feedback:', error);
-      toast.error('Não foi possível enviar seu feedback');
+      toast.error('Não foi possível enviar o feedback. Tente novamente.');
     } finally {
       setIsSubmitting(false);
     }
@@ -60,9 +54,9 @@ const FeedbackControl = ({ eventId, initialValue = null, onFeedbackSubmit = null
         <button
           type="button"
           disabled={isSubmitting}
-          onClick={() => submitFeedback('true_positive')}
+          onClick={() => submitFeedback(true)}
           className={`${btnSize} rounded-md flex items-center ${
-            feedback === 'true_positive'
+            isPositive
               ? 'bg-green-700 text-white'
               : 'bg-gray-700 text-gray-300 hover:bg-green-800'
           }`}
@@ -82,9 +76,9 @@ const FeedbackControl = ({ eventId, initialValue = null, onFeedbackSubmit = null
         <button
           type="button"
           disabled={isSubmitting}
-          onClick={() => submitFeedback('false_positive')}
+          onClick={() => submitFeedback(false)}
           className={`${btnSize} rounded-md flex items-center ${
-            feedback === 'false_positive'
+            !isPositive
               ? 'bg-red-700 text-white'
               : 'bg-gray-700 text-gray-300 hover:bg-red-800'
           }`}

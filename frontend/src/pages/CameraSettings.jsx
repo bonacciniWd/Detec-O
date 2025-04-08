@@ -1,21 +1,22 @@
 import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import axios from 'axios';
 import { useAuth } from '../context/AuthContext';
-import MainLayout from '../components/MainLayout';
-import DetectionSettings from '../components/DetectionSettings';
+import apiClient from '../services/api';
 import { toast } from 'react-toastify';
+import DetectionSettings from '../components/DetectionSettings';
 import AIModelSelector from '../components/AIModelSelector';
 import { Tab, Tabs, TabList, TabPanel } from 'react-tabs';
 import 'react-tabs/style/react-tabs.css';
+import './CustomTabs.css';
 
 const CameraSettings = () => {
-  const { deviceId } = useParams();
-  const navigate = useNavigate();
+  const { id: deviceId } = useParams();
   const { token } = useAuth();
+  const navigate = useNavigate();
+  
+  const [camera, setCamera] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
-  const [camera, setCamera] = useState(null);
   const [activeTab, setActiveTab] = useState('general'); // 'general' ou 'detection'
   const [formData, setFormData] = useState({
     name: '',
@@ -31,19 +32,19 @@ const CameraSettings = () => {
     const fetchCameraDetails = async () => {
       try {
         setLoading(true);
-        const response = await axios.get(`/api/devices/${deviceId}`, {
-          headers: { Authorization: `Bearer ${token}` }
-        });
         
-        setCamera(response.data);
+        // Usar o método específico para obter detalhes do dispositivo
+        const cameraData = await apiClient.getDevice(deviceId);
+        
+        setCamera(cameraData);
         setFormData({
-          name: response.data.name || '',
-          location: response.data.location || '',
-          username: response.data.username || '',
+          name: cameraData.name || '',
+          location: cameraData.location || '',
+          username: cameraData.username || '',
           password: '',  // Não preenchemos a senha por segurança
-          ip_address: response.data.ip_address || '',
-          port: response.data.port || 80,
-          connector_type: response.data.connector_type || 'onvif'
+          ip_address: cameraData.ip_address || '',
+          port: cameraData.port || 80,
+          connector_type: cameraData.connector_type || 'onvif'
         });
         setLoading(false);
       } catch (err) {
@@ -58,7 +59,7 @@ const CameraSettings = () => {
     } else {
       setLoading(false);
     }
-  }, [deviceId, token]);
+  }, [deviceId]);
 
   const handleInputChange = (e) => {
     const { name, value } = e.target;
@@ -72,11 +73,13 @@ const CameraSettings = () => {
     e.preventDefault();
     try {
       setLoading(true);
-      await axios.put(`/api/devices/${deviceId}`, formData, {
-        headers: { Authorization: `Bearer ${token}` }
-      });
+      
+      // Usar o método específico para atualizar o dispositivo
+      await apiClient.updateDevice(deviceId, formData);
+      
       setLoading(false);
       toast.success('Configurações da câmera atualizadas com sucesso');
+      navigate('/cameras'); // Redirecionar para a lista de câmeras
     } catch (err) {
       console.error('Error updating camera:', err);
       setError('Não foi possível atualizar a câmera. Tente novamente mais tarde.');
@@ -88,11 +91,9 @@ const CameraSettings = () => {
     if (window.confirm('Tem certeza que deseja excluir esta câmera?')) {
       try {
         setLoading(true);
-        await axios.delete(`/api/devices/${deviceId}`, {
-          headers: { Authorization: `Bearer ${token}` }
-        });
+        await apiClient.deleteDevice(deviceId);
         setLoading(false);
-        navigate('/camera-dashboard');
+        navigate('/cameras'); // Redirecionar para a lista de câmeras
         toast.success('Câmera excluída com sucesso');
       } catch (err) {
         console.error('Error deleting camera:', err);
@@ -120,28 +121,28 @@ const CameraSettings = () => {
   }
 
   return (
-    <MainLayout>
-      <div className="container mx-auto px-4 py-6">
-        <h1 className="text-2xl font-bold mb-6">Configurações da Câmera</h1>
-        
-        {error && (
-          <div className="bg-red-100 text-red-700 p-4 rounded mb-6">
-            {error}
-          </div>
-        )}
-        
+    <div className="container mx-auto px-4 py-6">
+      {error && (
+        <div className="bg-red-100 text-red-700 p-4 rounded mb-6">
+          {error}
+        </div>
+      )}
+      
+      <div className="camera-settings-tabs">
         <Tabs>
-          <TabList className="flex border-b mb-6">
-            <Tab className="px-4 py-2 mr-2 cursor-pointer border-b-2 border-transparent hover:text-blue-600">
-              Configurações Gerais
-            </Tab>
-            <Tab className="px-4 py-2 mr-2 cursor-pointer border-b-2 border-transparent hover:text-blue-600">
-              Configurações de Detecção
-            </Tab>
-            <Tab className="px-4 py-2 mr-2 cursor-pointer border-b-2 border-transparent hover:text-blue-600">
-              Modelo de IA
-            </Tab>
-          </TabList>
+          <div className="overflow-x-auto">
+            <TabList className="flex border-b mb-6 min-w-max">
+              <Tab className="px-4 py-2 mr-2 cursor-pointer border-b-2 border-transparent hover:text-blue-600 whitespace-nowrap">
+                Configurações Gerais
+              </Tab>
+              <Tab className="px-4 py-2 mr-2 cursor-pointer border-b-2 border-transparent hover:text-blue-600 whitespace-nowrap">
+                Configurações de Detecção
+              </Tab>
+              <Tab className="px-4 py-2 mr-2 cursor-pointer border-b-2 border-transparent hover:text-blue-600 whitespace-nowrap">
+                Modelo de IA
+              </Tab>
+            </TabList>
+          </div>
           
           {/* Configurações Gerais */}
           <TabPanel>
@@ -252,7 +253,7 @@ const CameraSettings = () => {
                   </div>
                 </div>
                 
-                <div className="mt-6 flex justify-between">
+                <div className="mt-6 flex flex-col sm:flex-row justify-between gap-4">
                   <button
                     type="button"
                     onClick={handleDelete}
@@ -275,9 +276,9 @@ const CameraSettings = () => {
           
           {/* Configurações de Detecção */}
           <TabPanel>
-            <div className="bg-white rounded-lg shadow p-6">
-              <DetectionSettings
-                cameraId={deviceId}
+            <div className="bg-white rounded-lg shadow ">
+              <DetectionSettings 
+                cameraId={deviceId} 
                 onSave={handleDetectionSettingsSave}
               />
             </div>
@@ -286,7 +287,7 @@ const CameraSettings = () => {
           {/* Modelo de IA */}
           <TabPanel>
             <div className="bg-white rounded-lg shadow p-6">
-              <AIModelSelector
+              <AIModelSelector 
                 cameraId={deviceId}
                 onSave={handleAISettingsSave}
               />
@@ -294,7 +295,7 @@ const CameraSettings = () => {
           </TabPanel>
         </Tabs>
       </div>
-    </MainLayout>
+    </div>
   );
 };
 

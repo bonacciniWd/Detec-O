@@ -9,26 +9,25 @@ const Sidebar = () => {
   const menuItems = [
     { path: '/dashboard', icon: <FaHome />, text: 'Dashboard' },
     { path: '/cameras', icon: <FaVideo />, text: 'Câmeras' },
-    { path: '/camera-dashboard', icon: <FaChartBar />, text: 'Monitoramento' },
     { path: '/events', icon: <FaBell />, text: 'Eventos' },
     { path: '/people', icon: <FaUser />, text: 'Pessoas' },
     { path: '/settings', icon: <FaCog />, text: 'Configurações' },
   ];
   
   return (
-    <aside className="bg-gray-800 text-white w-64 min-h-screen p-4">
+    <aside className="bg-gray-900 text-white w-64 min-h-screen p-4 border-r border-gray-800 flex flex-col">
       <div className="mb-8">
         <h1 className="text-2xl font-bold">Detec-O</h1>
         <p className="text-gray-400 text-sm">Sistema de Monitoramento</p>
       </div>
       
-      <nav>
+      <nav className="flex-1">
         <ul className="space-y-2">
           {menuItems.map((item) => (
             <li key={item.path}>
               <Link
                 to={item.path}
-                className={`flex items-center px-4 py-3 rounded-lg hover:bg-gray-700 transition-colors ${
+                className={`flex items-center px-4 py-3 rounded-lg hover:bg-gray-800 transition-colors ${
                   currentPath === item.path ? 'bg-blue-600 text-white' : 'text-gray-300'
                 }`}
               >
@@ -40,10 +39,10 @@ const Sidebar = () => {
         </ul>
       </nav>
       
-      <div className="mt-auto pt-8">
+      <div className="mt-auto pt-4 border-t border-gray-800 mb-2">
         <Link
           to="/logout"
-          className="flex items-center px-4 py-3 text-red-400 hover:bg-gray-700 rounded-lg"
+          className="flex items-center px-4 py-3 text-red-400 hover:bg-gray-800 rounded-lg"
         >
           <FaDoorOpen className="mr-3" />
           <span>Sair</span>

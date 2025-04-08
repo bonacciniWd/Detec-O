@@ -3,10 +3,11 @@
 @tailwind utilities;
 
 #root {
-  max-width: 1280px;
-  margin: 0 auto;
-  padding: 2rem;
-  text-align: center;
+  width: 100%;
+  min-height: 100vh;
+  margin: 0;
+  padding: 0;
+  text-align: left;
 }
 
 .logo {
@@ -43,4 +44,86 @@
 
 .read-the-docs {
   color: #888;
+}
+
+/* Estilos para o layout do dashboard */
+.dashboard-container {
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+}
+
+.content-container {
+  display: flex;
+  flex: 1;
+}
+
+.main-content {
+  flex: 1;
+  overflow-x: hidden;
+}
+
+/* Estilos para tema escuro */
+.bg-slate-950 {
+  --tw-bg-opacity: 1;
+  background-color: rgb(2 6 23 / var(--tw-bg-opacity));
+}
+
+.bg-slate-900 {
+  --tw-bg-opacity: 1;
+  background-color: rgb(15 23 42 / var(--tw-bg-opacity));
+}
+
+.bg-slate-800 {
+  --tw-bg-opacity: 1;
+  background-color: rgb(30 41 59 / var(--tw-bg-opacity));
+}
+
+/* Estilos para cartões em tema escuro */
+.dark-card {
+  background-color: rgb(15 23 42 / var(--tw-bg-opacity));
+  border: 1px solid rgb(30 41 59 / var(--tw-border-opacity));
+  border-radius: 0.5rem;
+  box-shadow: 0 4px 6px -1px rgb(0 0 0 / 0.1), 0 2px 4px -2px rgb(0 0 0 / 0.1);
+}
+
+/* Ajustes de texto para tema escuro */
+.text-dark-subtle {
+  color: rgb(148 163 184 / 1); /* slate-400 */
+}
+
+.text-dark-muted {
+  color: rgb(100 116 139 / 1); /* slate-500 */
+}
+
+/* Estilos para elementos de formulário em tema escuro */
+input.dark-input, select.dark-input, textarea.dark-input {
+  background-color: rgb(15 23 42 / 1); /* slate-900 */
+  border-color: rgb(51 65 85 / 1); /* slate-700 */
+  color: rgb(226 232 240 / 1); /* slate-200 */
+}
+
+input.dark-input:focus, select.dark-input:focus, textarea.dark-input:focus {
+  border-color: rgb(59 130 246 / 1); /* blue-500 */
+  box-shadow: 0 0 0 2px rgb(59 130 246 / 0.3);
+}
+
+/* Estilos para botões em tema escuro */
+.dark-btn {
+  background-color: rgb(30 41 59 / 1); /* slate-800 */
+  color: rgb(226 232 240 / 1); /* slate-200 */
+  transition: all 150ms ease;
+}
+
+.dark-btn:hover {
+  background-color: rgb(51 65 85 / 1); /* slate-700 */
+}
+
+.dark-btn-primary {
+  background-color: rgb(59 130 246 / 1); /* blue-500 */
+  color: white;
+}
+
+.dark-btn-primary:hover {
+  background-color: rgb(37 99 235 / 1); /* blue-600 */
 }

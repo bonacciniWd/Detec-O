@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import PropTypes from 'prop-types';
 import axios from 'axios';
+import apiClient from '../services/api';
 import { toast } from 'react-toastify';
 
 /**
@@ -27,11 +28,11 @@ const AIModelSelector = ({ cameraId, onSave }) => {
       
       try {
         // Buscar modelos disponíveis
-        const modelsResponse = await axios.get('/api/v1/ai/models');
+        const modelsResponse = await apiClient.get('/ai/models');
         setModels(modelsResponse.data);
         
         // Buscar configurações atuais da câmera
-        const settingsResponse = await axios.get(`/api/v1/cameras/${cameraId}/ai-settings`);
+        const settingsResponse = await apiClient.get(`/cameras/${cameraId}/ai-settings`);
         const settings = settingsResponse.data;
         
         setCurrentSettings({
@@ -45,7 +46,7 @@ const AIModelSelector = ({ cameraId, onSave }) => {
         // Definir modelo selecionado
         if (settings.model_id) {
           setSelectedModel(settings.model_id);
-        } else if (modelsResponse.data.length > 0) {
+        } else if (modelsResponse.data && Array.isArray(modelsResponse.data) && modelsResponse.data.length > 0) {
           // Selecionar o primeiro modelo como padrão
           setSelectedModel(modelsResponse.data[0].id);
         }
@@ -87,7 +88,7 @@ const AIModelSelector = ({ cameraId, onSave }) => {
     setIsLoading(true);
     
     try {
-      await axios.put(`/api/v1/cameras/${cameraId}/ai-settings`, currentSettings);
+      await apiClient.put(`/cameras/${cameraId}/ai-settings`, currentSettings);
       toast.success('Configurações de IA salvas com sucesso');
       
       if (onSave) {
@@ -137,7 +138,7 @@ const AIModelSelector = ({ cameraId, onSave }) => {
     );
   };
   
-  if (isLoading && models.length === 0) {
+  if (isLoading && (!models || !Array.isArray(models) || models.length === 0)) {
     return (
       <div className="flex justify-center items-center p-8">
         <div className="animate-spin rounded-full h-8 w-8 border-t-2 border-b-2 border-blue-500"></div>
@@ -180,11 +181,11 @@ const AIModelSelector = ({ cameraId, onSave }) => {
           <div className="border-t border-gray-200 pt-4">
             <h4 className="font-medium text-gray-700 mb-3">Selecione o Modelo:</h4>
             
-            {models.length === 0 ? (
+            {!models || models.length === 0 ? (
               <p className="text-gray-500">Nenhum modelo disponível</p>
             ) : (
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                {models.map(model => renderModelCard(model))}
+                {Array.isArray(models) && models.map(model => renderModelCard(model))}
               </div>
             )}
           </div>

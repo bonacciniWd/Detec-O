@@ -13,7 +13,7 @@ const MainLayout = ({ children }) => {
   };
 
   return (
-    <div className="flex h-screen bg-gray-100 overflow-hidden">
+    <div className="flex h-screen bg-gray-900 text-white overflow-hidden">
       {/* Sidebar - escondida em mobile quando fechada */}
       <div 
         className={`${
@@ -26,7 +26,7 @@ const MainLayout = ({ children }) => {
       {/* Overlay para fechar sidebar em mobile */}
       {sidebarOpen && isMobile && (
         <div 
-          className="fixed inset-0 bg-gray-600 bg-opacity-50 z-20 md:hidden"
+          className="fixed inset-0 bg-black bg-opacity-50 z-20 md:hidden"
           onClick={toggleSidebar}
         />
       )}
@@ -35,7 +35,7 @@ const MainLayout = ({ children }) => {
       <div className="flex flex-col flex-1 overflow-hidden">
         <Navbar toggleSidebar={toggleSidebar} />
         
-        <main className="flex-1 overflow-y-auto overflow-x-hidden bg-gray-100 pb-safe">
+        <main className="flex-1 overflow-y-auto overflow-x-hidden bg-gray-900 pb-safe">
           <div className="container mx-auto px-4 py-6 page-container">
             {children}
           </div>

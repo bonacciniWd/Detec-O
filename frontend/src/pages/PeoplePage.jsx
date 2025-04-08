@@ -2,6 +2,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { FaPlus, FaUser, FaUsers, FaEdit, FaTrash, FaCamera, FaUserPlus, FaSearch } from 'react-icons/fa';
 import api from '../services/api';
+import { toast } from 'react-hot-toast';
 
 const PeoplePage = () => {
   const navigate = useNavigate();
@@ -34,11 +35,12 @@ const PeoplePage = () => {
   const fetchPeople = async () => {
     try {
       setLoading(true);
-      const response = await api.get('/api/v1/persons');
+      setError(null);
+      const response = await api.get('/v1/persons');
       setPeople(response.data.items || []);
     } catch (err) {
       console.error('Erro ao buscar pessoas:', err);
-      setError('Não foi possível carregar a lista de pessoas.');
+      setError('Falha ao carregar pessoas cadastradas. Por favor, tente novamente.');
     } finally {
       setLoading(false);
     }
@@ -193,30 +195,33 @@ const PeoplePage = () => {
       return;
     }
     
+    setLoading(true);
+    setError(null);
+    
     try {
       let response;
       
       if (modalType === 'add') {
         // Adicionar nova pessoa
-        response = await api.post('/api/v1/persons', formData);
-        alert('Pessoa cadastrada com sucesso!');
+        response = await api.post('/v1/persons', formData);
+        toast.success('Pessoa cadastrada com sucesso!');
       } else if (modalType === 'edit') {
         // Atualizar pessoa existente
         const { name, description, category } = formData;
-        response = await api.put(`/api/v1/persons/${selectedPerson.id}`, {
+        response = await api.put(`/v1/persons/${selectedPerson.id}`, {
           name,
           description,
           category
         });
-        alert('Pessoa atualizada com sucesso!');
+        toast.success('Pessoa atualizada com sucesso!');
       } else if (modalType === 'addFace') {
         // Adicionar face a pessoa existente
-        response = await api.post(`/api/v1/persons/${selectedPerson.id}/faces`, {
+        response = await api.post(`/v1/persons/${selectedPerson.id}/faces`, {
           person_id: selectedPerson.id,
           face_image: formData.face_image,
           label: formData.label || undefined
         });
-        alert('Face adicionada com sucesso!');
+        toast.success('Face adicionada com sucesso!');
       }
       
       // Fechar modal e recarregar lista
@@ -225,23 +230,29 @@ const PeoplePage = () => {
       
     } catch (err) {
       console.error('Erro ao salvar dados:', err);
-      alert(`Erro: ${err.response?.data?.detail || err.message}`);
+      setError('Falha ao salvar. Por favor, tente novamente.');
+      toast.error('Falha ao salvar dados');
+    } finally {
+      setLoading(false);
     }
   };
   
   // Remover pessoa
   const handleDelete = async (personId) => {
-    if (!confirm('Tem certeza que deseja remover esta pessoa?')) {
+    if (!window.confirm('Tem certeza que deseja excluir esta pessoa?')) {
       return;
     }
     
     try {
-      await api.delete(`/api/v1/persons/${personId}`);
-      alert('Pessoa removida com sucesso!');
+      setLoading(true);
+      await api.delete(`/v1/persons/${personId}`);
+      toast.success('Pessoa excluída com sucesso');
       fetchPeople();
     } catch (err) {
-      console.error('Erro ao remover pessoa:', err);
-      alert(`Erro: ${err.response?.data?.detail || err.message}`);
+      console.error('Erro ao excluir pessoa:', err);
+      toast.error('Falha ao excluir pessoa');
+    } finally {
+      setLoading(false);
     }
   };
   

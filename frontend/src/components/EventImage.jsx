@@ -12,7 +12,9 @@ const EventImage = ({
   className = "", 
   altText,
   width = "full",
-  height = "auto"
+  height = "auto",
+  fullWidth = false,
+  onClick
 }) => {
   const [isLoading, setIsLoading] = useState(true);
   const [hasError, setHasError] = useState(false);
@@ -20,7 +22,7 @@ const EventImage = ({
   const imageRef = useRef(null);
   
   // Construir URL da imagem
-  const imageUrl = `${eventService.getApiBaseUrl()}/api/v1/events/${eventId}/image`;
+  const imageUrl = `${eventService.getApiBaseUrl()}/v1/events/${eventId}/image`;
   
   // Classe CSS para a largura da imagem
   const widthClass = {
@@ -99,10 +101,16 @@ const EventImage = ({
   
   // Construir o JSX completo
   return (
-    <div className={`${zoomedClassName} ${className}`} onClick={toggleZoom}>
+    <div className={`${zoomedClassName} ${className}`} onClick={onClick}>
       {isLoading && (
         <div className="absolute inset-0 flex items-center justify-center bg-gray-800 bg-opacity-50">
           <div className="animate-pulse text-blue-400">Carregando...</div>
+        </div>
+      )}
+      
+      {hasError && (
+        <div className="absolute inset-0 flex items-center justify-center bg-gray-100 dark:bg-gray-800 text-center p-4">
+          <p className="text-red-500 text-sm">{`Não foi possível carregar a imagem do evento: ${error}`}</p>
         </div>
       )}
       
@@ -110,18 +118,11 @@ const EventImage = ({
         ref={imageRef}
         src={imageUrl}
         alt={imageAltText}
-        className={`${widthClass} ${heightClass} rounded ${hasError ? 'hidden' : 'block'}`}
+        className={`${widthClass} ${heightClass} rounded ${hasError ? 'hidden' : 'block'} ${fullWidth ? '' : 'max-h-[400px] object-contain'}`}
         onLoad={handleImageLoad}
         onError={handleImageError}
+        onClick={onClick}
       />
-      
-      {hasError && (
-        <img
-          src={fallbackImageSrc}
-          alt="Imagem não disponível"
-          className={`${widthClass} ${heightClass} rounded`}
-        />
-      )}
       
       {/* Container para as bounding boxes */}
       {!isLoading && !hasError && renderBoundingBoxes()}

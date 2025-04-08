@@ -27,7 +27,7 @@ const defaultSettings = {
 // Função para obter as configurações de um usuário
 export const getUserSettings = async (userId) => {
   try {
-    const response = await api.get(`/api/v1/users/${userId}/settings`);
+    const response = await api.get(`/v1/users/${userId}/settings`);
     return response.data;
   } catch (error) {
     console.error('Erro ao buscar configurações:', error);
@@ -47,5 +47,16 @@ export const updateUserSettings = async (userId, settings) => {
     // Simulando uma resposta bem-sucedida para ambiente de desenvolvimento
     console.log('Simulando resposta bem-sucedida para atualização de configurações');
     return settings;
+  }
+};
+
+// Função para salvar as configurações de um usuário
+export const saveUserSettings = async (userId, settings) => {
+  try {
+    const response = await api.put(`/v1/users/${userId}/settings`, settings);
+    return response.data;
+  } catch (error) {
+    console.error('Erro ao salvar configurações:', error);
+    throw error;
   }
 }; 

@@ -35,6 +35,135 @@ const delay = (ms = 300) => new Promise(resolve => setTimeout(resolve, ms));
  * Cliente de API simulada
  */
 const mockApiClient = {
+  // Métodos HTTP genéricos
+  get: async (url, config) => {
+    await delay();
+    console.log('Mock GET:', url);
+    
+    // Simulações específicas com base na URL
+    if (url.includes('/users/') && url.includes('/settings')) {
+      return {
+        data: {
+          notifications: {
+            email: false,
+            browser: true,
+            mobile: false,
+            frequency: 'immediate',
+          },
+          detection: {
+            confidenceThreshold: 0.6,
+            minDetectionInterval: 30,
+            motionSensitivity: 5,
+            enableWeaponDetection: true,
+            enableFaceDetection: true,
+            enableBehaviorAnalysis: true,
+          },
+          interface: {
+            darkMode: false,
+            compactView: false,
+            showStatistics: true,
+            highlightDetections: true,
+          }
+        }
+      };
+    }
+    
+    // Mock para estatísticas do dashboard
+    if (url.includes('/statistics')) {
+      return {
+        data: {
+          total_events: 156,
+          events_today: 23,
+          active_cameras: 8,
+          detection_accuracy: 0.89,
+          events_by_type: {
+            person: 98,
+            vehicle: 42,
+            animal: 16
+          },
+          events_by_severity: {
+            high: 31,
+            medium: 67,
+            low: 58
+          },
+          events_by_hour: [2, 1, 0, 1, 0, 3, 5, 8, 12, 14, 10, 11, 13, 15, 14, 12, 9, 7, 5, 6, 4, 3, 2, 1]
+        }
+      };
+    }
+    
+    // Mock para eventos
+    if (url.includes('/events')) {
+      return {
+        data: {
+          events: Array.from({ length: 20 }, (_, i) => ({
+            id: `event-${i + 1}`,
+            timestamp: new Date(Date.now() - i * 3600000).toISOString(),
+            camera_id: `camera-${(i % 4) + 1}`,
+            camera_name: `Câmera ${(i % 4) + 1}`,
+            event_type: ['person', 'vehicle', 'animal'][i % 3],
+            confidence: 0.75 + (Math.random() * 0.2),
+            severity: ['low', 'medium', 'high'][i % 3],
+            snapshot_url: `https://picsum.photos/id/${(i % 30) + 10}/640/480`
+          })),
+          total: 156,
+          page: 1,
+          per_page: 20
+        }
+      };
+    }
+    
+    // Fallback genérico
+    return {
+      data: { message: 'Mock data not implemented for this endpoint' }
+    };
+  },
+  
+  post: async (url, data, config) => {
+    await delay();
+    console.log('Mock POST:', url, data);
+    
+    // Sempre retorna sucesso como padrão
+    return {
+      data: {
+        success: true,
+        message: 'Operação realizada com sucesso',
+        ...data
+      }
+    };
+  },
+  
+  put: async (url, data, config) => {
+    await delay();
+    console.log('Mock PUT:', url, data);
+    
+    // Sempre retorna sucesso como padrão
+    return {
+      data: {
+        success: true,
+        message: 'Atualização realizada com sucesso',
+        ...data
+      }
+    };
+  },
+  
+  delete: async (url, config) => {
+    await delay();
+    console.log('Mock DELETE:', url);
+    
+    // Sempre retorna sucesso como padrão
+    return {
+      data: {
+        success: true,
+        message: 'Item removido com sucesso'
+      }
+    };
+  },
+  
+  // Para compatibilidade com axios
+  defaults: {
+    baseURL: '/api'
+  },
+  
   // Método para obter a URL base
   getBaseUrl: () => {
     return '/api';

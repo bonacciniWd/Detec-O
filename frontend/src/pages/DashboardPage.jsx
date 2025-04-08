@@ -43,24 +43,19 @@ function DashboardPage() {
     const fetchDashboardData = async () => {
       setIsLoading(true);
       try {
-        // Aqui chamaria APIs reais para buscar dados do dashboard
-        const camerasResponse = await api.get('/api/v1/cameras');
-        const eventsResponse = await api.get('/api/v1/events', { params: { limit: 50 } });
+        setEventsError(null);
         
-        // Processamento simplificado para demonstração
-        let cameraList = [];
-        if (Array.isArray(camerasResponse.data)) {
-          cameraList = camerasResponse.data;
-        } else if (camerasResponse.data && camerasResponse.data.items) {
-          cameraList = camerasResponse.data.items;
-        }
+        // Fazer múltiplas requisições em paralelo
+        const [camerasResponse, eventsResponse] = await Promise.all([
+          api.get('/v1/cameras'),
+          api.get('/v1/events', { params: { limit: 50 } })
+        ]);
+
+        // Processar dados das câmeras
+        const cameraList = camerasResponse.data;
         
-        let eventsList = [];
-        if (Array.isArray(eventsResponse.data)) {
-          eventsList = eventsResponse.data;
-        } else if (eventsResponse.data && eventsResponse.data.items) {
-          eventsList = eventsResponse.data.items;
-        }
+        // Processar dados dos eventos
+        const eventsList = eventsResponse.data.events || [];
         
         // Calcular estatísticas básicas
         const activeCameras = cameraList.filter(cam => cam.running || cam.detection_enabled).length;
@@ -121,15 +116,23 @@ function DashboardPage() {
           eventsTimeSeries,
           detectionAccuracy: Math.round(detectionAccuracy)
         });
-      } catch (error) {
-        console.error("Erro ao buscar dados do dashboard:", error);
+      } catch (err) {
+        console.error('Erro ao buscar dados do dashboard:', err);
+        setEventsError('Não foi possível carregar os dados. Por favor, recarregue a página.');
       } finally {
         setIsLoading(false);
       }
     };
 
     fetchDashboardData();
-  }, [timeRange]);
+    
+    // Configurar atualização automática a cada 30 segundos
+    const intervalId = setInterval(() => {
+      fetchDashboardData();
+    }, 30000);
+    
+    return () => clearInterval(intervalId); // Limpar intervalo ao desmontar
+  }, []);
 
   const fetchRecentEvents = async () => {
     setIsLoadingEvents(true);
@@ -246,21 +249,21 @@ function DashboardPage() {
           </div>
 
           {/* Cartões de Estatísticas */}
-          <div className="grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-4">
+          <div className="grid grid-cols-2 gap-4 md:gap-5 lg:grid-cols-4">
             {/* Câmeras Totais */}
             <div className="bg-white dark:bg-gray-800 overflow-hidden shadow rounded-lg">
-              <div className="px-4 py-5 sm:p-6">
+              <div className="px-3 py-4 sm:px-4 sm:py-5">
                 <div className="flex items-center">
-                  <div className="flex-shrink-0 bg-blue-500 rounded-md p-3">
-                    <svg className="h-6 w-6 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <div className="flex-shrink-0 bg-blue-500 rounded-md p-2 sm:p-3">
+                    <svg className="h-5 w-5 sm:h-6 sm:w-6 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15 10l4.553-2.276A1 1 0 0121 8.618v6.764a1 1 0 01-1.447.894L15 14M5 18h8a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z" />
                     </svg>
                   </div>
-                  <div className="ml-5 w-0 flex-1">
+                  <div className="ml-3 sm:ml-5 w-0 flex-1">
                     <dl>
-                      <dt className="text-sm font-medium text-gray-500 dark:text-gray-400 truncate">Câmeras Totais</dt>
+                      <dt className="text-xs sm:text-sm font-medium text-gray-500 dark:text-gray-400 truncate">Câmeras Totais</dt>
                       <dd className="flex items-baseline">
-                        <div className="text-2xl font-semibold text-gray-800 dark:text-white">{statistics.totalCameras}</div>
+                        <div className="text-xl sm:text-2xl font-semibold text-gray-800 dark:text-white">{statistics.totalCameras}</div>
                       </dd>
                     </dl>
                   </div>
@@ -270,18 +273,18 @@ function DashboardPage() {
 
             {/* Câmeras Ativas */}
             <div className="bg-white dark:bg-gray-800 overflow-hidden shadow rounded-lg">
-              <div className="px-4 py-5 sm:p-6">
+              <div className="px-3 py-4 sm:px-4 sm:py-5">
                 <div className="flex items-center">
-                  <div className="flex-shrink-0 bg-green-500 rounded-md p-3">
-                    <svg className="h-6 w-6 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <div className="flex-shrink-0 bg-green-500 rounded-md p-2 sm:p-3">
+                    <svg className="h-5 w-5 sm:h-6 sm:w-6 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
                     </svg>
                   </div>
-                  <div className="ml-5 w-0 flex-1">
+                  <div className="ml-3 sm:ml-5 w-0 flex-1">
                     <dl>
-                      <dt className="text-sm font-medium text-gray-500 dark:text-gray-400 truncate">Câmeras Ativas</dt>
+                      <dt className="text-xs sm:text-sm font-medium text-gray-500 dark:text-gray-400 truncate">Câmeras Ativas</dt>
                       <dd className="flex items-baseline">
-                        <div className="text-2xl font-semibold text-gray-800 dark:text-white">{statistics.activeCameras}</div>
+                        <div className="text-xl sm:text-2xl font-semibold text-gray-800 dark:text-white">{statistics.activeCameras}</div>
                       </dd>
                     </dl>
                   </div>
@@ -291,18 +294,18 @@ function DashboardPage() {
 
             {/* Total de Eventos */}
             <div className="bg-white dark:bg-gray-800 overflow-hidden shadow rounded-lg">
-              <div className="px-4 py-5 sm:p-6">
+              <div className="px-3 py-4 sm:px-4 sm:py-5">
                 <div className="flex items-center">
-                  <div className="flex-shrink-0 bg-yellow-500 rounded-md p-3">
-                    <svg className="h-6 w-6 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <div className="flex-shrink-0 bg-yellow-500 rounded-md p-2 sm:p-3">
+                    <svg className="h-5 w-5 sm:h-6 sm:w-6 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
                     </svg>
                   </div>
-                  <div className="ml-5 w-0 flex-1">
+                  <div className="ml-3 sm:ml-5 w-0 flex-1">
                     <dl>
-                      <dt className="text-sm font-medium text-gray-500 dark:text-gray-400 truncate">Total de Eventos</dt>
+                      <dt className="text-xs sm:text-sm font-medium text-gray-500 dark:text-gray-400 truncate">Total de Eventos</dt>
                       <dd className="flex items-baseline">
-                        <div className="text-2xl font-semibold text-gray-800 dark:text-white">{statistics.totalEvents}</div>
+                        <div className="text-xl sm:text-2xl font-semibold text-gray-800 dark:text-white">{statistics.totalEvents}</div>
                       </dd>
                     </dl>
                   </div>
@@ -312,18 +315,18 @@ function DashboardPage() {
 
             {/* Taxa de Precisão */}
             <div className="bg-white dark:bg-gray-800 overflow-hidden shadow rounded-lg">
-              <div className="px-4 py-5 sm:p-6">
+              <div className="px-3 py-4 sm:px-4 sm:py-5">
                 <div className="flex items-center">
-                  <div className="flex-shrink-0 bg-indigo-500 rounded-md p-3">
-                    <svg className="h-6 w-6 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <div className="flex-shrink-0 bg-indigo-500 rounded-md p-2 sm:p-3">
+                    <svg className="h-5 w-5 sm:h-6 sm:w-6 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
                     </svg>
                   </div>
-                  <div className="ml-5 w-0 flex-1">
+                  <div className="ml-3 sm:ml-5 w-0 flex-1">
                     <dl>
-                      <dt className="text-sm font-medium text-gray-500 dark:text-gray-400 truncate">Taxa de Precisão</dt>
+                      <dt className="text-xs sm:text-sm font-medium text-gray-500 dark:text-gray-400 truncate">Taxa de Precisão</dt>
                       <dd className="flex items-baseline">
-                        <div className="text-2xl font-semibold text-gray-800 dark:text-white">{statistics.detectionAccuracy}%</div>
+                        <div className="text-xl sm:text-2xl font-semibold text-gray-800 dark:text-white">{statistics.detectionAccuracy}%</div>
                       </dd>
                     </dl>
                   </div>

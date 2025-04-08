@@ -1,0 +1,67 @@
+/* Estilos personalizados para as abas de configurações de câmera */
+
+/* Estilo para abas em dispositivos móveis */
+@media (max-width: 640px) {
+  .camera-settings-tabs {
+    overflow: visible;
+  }
+  
+  .camera-settings-tabs .react-tabs__tab-list {
+    display: flex;
+    overflow-x: auto;
+    scrollbar-width: thin;
+    -webkit-overflow-scrolling: touch;
+    padding-bottom: 5px;
+  }
+  
+  .camera-settings-tabs .react-tabs__tab {
+    flex: none;
+  }
+  
+  .camera-settings-tabs .react-tabs__tab--selected {
+    border-bottom: 2px solid #3b82f6 !important;
+    color: #3b82f6;
+  }
+  
+  /* Customizar a scrollbar para ser mais fina e menos intrusiva */
+  .camera-settings-tabs .react-tabs__tab-list::-webkit-scrollbar {
+    height: 4px;
+  }
+  
+  .camera-settings-tabs .react-tabs__tab-list::-webkit-scrollbar-track {
+    background: #f1f1f1;
+    border-radius: 10px;
+  }
+  
+  .camera-settings-tabs .react-tabs__tab-list::-webkit-scrollbar-thumb {
+    background: #cccccc;
+    border-radius: 10px;
+  }
+  
+  .camera-settings-tabs .react-tabs__tab-list::-webkit-scrollbar-thumb:hover {
+    background: #999999;
+  }
+  
+  /* Garantir que o conteúdo das tabs não role horizontalmente automaticamente */
+  .camera-settings-tabs .react-tabs__tab-panel {
+    overflow-x: visible;
+  }
+}
+
+/* Melhorar a exibição dos formulários em telas pequenas */
+@media (max-width: 480px) {
+  .camera-settings-tabs form .grid {
+    gap: 1rem;
+  }
+  
+  .camera-settings-tabs input,
+  .camera-settings-tabs select {
+    font-size: 16px; /* Impedir zoom automático em iPhones */
+    padding: 0.5rem;
+  }
+}
+
+/* Destacar a aba ativa com cores mais evidentes */
+.react-tabs__tab--selected {
+  font-weight: 600;
+} 

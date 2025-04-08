@@ -1,383 +1,422 @@
-import React, { useState, useEffect, useRef } from 'react';
-import apiClient from '../services/api';
+import React, { useState, useEffect } from 'react';
 import { toast } from 'react-toastify';
-import { FaLock, FaUnlock, FaPersonWalking, FaCar, FaPlus, FaMinus } from 'react-icons/fa6';
-import DetectionZone from './DetectionZone';
-// Importar API mockada para desenvolvimento
-import mockApiClient from '../services/mock-api';
+import apiClient from '../services/api';
 
-// Escolher qual API usar com base no ambiente
-const client = process.env.NODE_ENV === 'development' ? mockApiClient : apiClient;
-
-/**
- * Componente de configurações avançadas para ajustar parâmetros 
- * de detecção e reduzir falsos positivos.
- */
-const DetectionSettings = ({ cameraId }) => {
-  const [settings, setSettings] = useState({
-    confidence_threshold: 0.5, // 0.0 - 1.0 (padrão: 0.5)
-    min_detection_interval: 1, // segundos
-    motion_sensitivity: 0.3, // 0.0 - 1.0 (padrão: 0.3)
-    detection_classes: ['person', 'car', 'animal'], // classes a detectar
-    notifications_enabled: true,
-    save_all_frames: false,
-    detection_zone: null, // zona de detecção personalizada
-    detectionZones: []
-  });
-
+const DetectionSettings = ({ cameraId, onSave }) => {
   const [isLoading, setIsLoading] = useState(true);
-  const [isSaving, setIsSaving] = useState(false);
-  const [advanced, setAdvanced] = useState(false);
-  // Detecta se é dispositivo móvel
-  const [isMobile, setIsMobile] = useState(false);
-  // Referências para os sliders
-  const confidenceSliderRef = useRef(null);
-  const motionSliderRef = useRef(null);
+  const [settings, setSettings] = useState({
+    enabled: false,
+    confidence_threshold: 0.5,
+    iou_threshold: 0.45,
+    detect_objects: true,
+    detect_behaviors: true,
+    detection_interval: 5,
+    alert_on_detection: true,
+    object_classes: ["knife", "gun", "scissors"],
+    behavior_classes: ["aggressive_posture", "running", "fighting"]
+  });
   
-  const [cameraPreviewUrl, setCameraPreviewUrl] = useState('');
-  const [detectionZones, setDetectionZones] = useState([]);
+  const [isUploading, setIsUploading] = useState(false);
+  const [testImage, setTestImage] = useState(null);
+  const [testImagePreview, setTestImagePreview] = useState(null);
+  const [detectionResult, setDetectionResult] = useState(null);
   
-  // Verificar se é dispositivo móvel na montagem
+  // Carregar configurações existentes
   useEffect(() => {
-    const checkMobile = () => {
-      const mobile = window.matchMedia('(max-width: 768px)').matches;
-      setIsMobile(mobile);
-    };
-    
-    // Verificar inicialmente
-    checkMobile();
-    
-    // Verificar em redimensionamentos
-    window.addEventListener('resize', checkMobile);
-    
-    return () => {
-      window.removeEventListener('resize', checkMobile);
-    };
-  }, []);
-  
-  // Classes para detecção disponíveis
-  const availableClasses = [
-    { value: 'person', label: 'Pessoas' },
-    { value: 'car', label: 'Veículos' },
-    { value: 'animal', label: 'Animais' },
-    { value: 'bird', label: 'Pássaros' },
-    { value: 'cat', label: 'Gatos' },
-    { value: 'dog', label: 'Cães' },
-    { value: 'bicycle', label: 'Bicicletas' },
-    { value: 'motorcycle', label: 'Motos' }
-  ];
-
-  // Carregar configurações da câmera
-  useEffect(() => {
-    const loadSettings = async () => {
-      setIsLoading(true);
-      setError(null);
-      
+    const fetchSettings = async () => {
       try {
-        if (cameraId) {
-          // Usar cliente API escolhido com base no ambiente
-          const response = await client.getDetectionSettings(cameraId);
-          setSettings(response);
-          
-          // Carregar preview da câmera para usar com as zonas
-          setCameraPreviewUrl(client.getCameraPreview(cameraId));
+        setIsLoading(true);
+        const response = await apiClient.get(`/v1/detection/settings/${cameraId}`);
+        if (response.data && response.data.settings) {
+          setSettings(response.data.settings);
         }
       } catch (error) {
-        console.error('Erro ao carregar configurações:', error);
-        setError('Não foi possível carregar as configurações. Tente novamente.');
+        console.error('Erro ao carregar configurações de detecção:', error);
+        toast.error('Erro ao carregar configurações de detecção');
       } finally {
         setIsLoading(false);
       }
     };
     
-    loadSettings();
+    fetchSettings();
   }, [cameraId]);
+  
+  // Atualizar settings quando um campo for alterado
+  const handleSettingChange = (name, value) => {
+    setSettings(prevSettings => ({
+      ...prevSettings,
+      [name]: value
+    }));
+  };
+  
+  // Alternar classes a serem detectadas
+  const toggleObjectClass = (className) => {
+    const classes = [...settings.object_classes];
+    const index = classes.indexOf(className);
+    
+    if (index >= 0) {
+      classes.splice(index, 1);
+    } else {
+      classes.push(className);
+    }
+    
+    setSettings(prevSettings => ({
+      ...prevSettings,
+      object_classes: classes
+    }));
+  };
+  
+  // Alternar classes de comportamento a serem detectadas
+  const toggleBehaviorClass = (className) => {
+    const classes = [...settings.behavior_classes];
+    const index = classes.indexOf(className);
+    
+    if (index >= 0) {
+      classes.splice(index, 1);
+    } else {
+      classes.push(className);
+    }
+    
+    setSettings(prevSettings => ({
+      ...prevSettings,
+      behavior_classes: classes
+    }));
+  };
 
   // Salvar configurações
-  const handleSave = async () => {
-    setIsSaving(true);
+  const saveSettings = async () => {
     try {
-      const updatedSettings = {
-        ...settings,
-        detectionZones // Incluir as zonas de detecção que foram modificadas
-      };
-      
-      // Salvar usando o cliente API escolhido
-      await client.saveDetectionSettings(cameraId, updatedSettings);
-      toast.success('Configurações de detecção atualizadas com sucesso');
+      setIsLoading(true);
+      await apiClient.post(`/v1/detection/configure/${cameraId}`, settings);
+      toast.success('Configurações salvas com sucesso');
       
       if (onSave) {
-        onSave(updatedSettings);
+        onSave(settings);
       }
     } catch (error) {
       console.error('Erro ao salvar configurações:', error);
-      toast.error('Falha ao salvar configurações. Tente novamente.');
+      toast.error('Erro ao salvar configurações');
     } finally {
-      setIsSaving(false);
-    }
-  };
-
-  // Lidar com mudanças nos controles
-  const handleChange = (e) => {
-    const { name, value, type, checked } = e.target;
-    
-    // Usar parseFloat para valores numéricos
-    const processedValue = type === 'checkbox' ? checked : 
-                          (type === 'number' || type === 'range') ? parseFloat(value) : value;
-    
-    // Atualiza o estado
-    setSettings(prev => ({
-      ...prev,
-      [name]: processedValue
-    }));
-    
-    // Log para debug em dispositivos móveis
-    if (isMobile) {
-      console.log(`${name} alterado para ${processedValue}`);
+      setIsLoading(false);
     }
   };
   
-  // Atualizar classes de detecção
-  const handleClassToggle = (classValue) => {
-    setSettings(prev => {
-      const classes = [...prev.detection_classes];
+  // Lidar com upload de imagem para teste
+  const handleImageChange = (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+    
+    setTestImage(file);
+    
+    // Criar preview
+    const reader = new FileReader();
+    reader.onloadend = () => {
+      setTestImagePreview(reader.result);
+    };
+    reader.readAsDataURL(file);
+    
+    // Limpar resultado anterior
+    setDetectionResult(null);
+  };
+  
+  // Testar detecção com uma imagem
+  const handleTestDetection = async () => {
+    if (!testImage) {
+      toast.warning('Selecione uma imagem para teste');
+      return;
+    }
+    
+    try {
+      setIsUploading(true);
       
-      if (classes.includes(classValue)) {
-        return {
-          ...prev,
-          detection_classes: classes.filter(c => c !== classValue)
-        };
-      } else {
-        return {
-          ...prev,
-          detection_classes: [...classes, classValue]
-        };
-      }
-    });
+      const formData = new FormData();
+      formData.append('file', testImage);
+      
+      const response = await apiClient.post(
+        `/v1/detection/analyze?confidence=${settings.confidence_threshold}&camera_id=${cameraId}`, 
+        formData,
+        {
+          headers: {
+            'Content-Type': 'multipart/form-data'
+          }
+        }
+      );
+      
+      setDetectionResult(response.data);
+      toast.success(`Detecção concluída. ${response.data.detections.length} objetos encontrados.`);
+    } catch (error) {
+      console.error('Erro ao testar detecção:', error);
+      toast.error('Erro ao processar imagem');
+    } finally {
+      setIsUploading(false);
+    }
   };
-
-  // Tratamento especial para sliders em dispositivos móveis
-  const handleSliderTouchEnd = (e) => {
-    if (!isMobile) return;
-    
-    const { name, value } = e.target;
-    const numValue = parseFloat(value);
-    
-    // Força a atualização no fim do toque
-    setSettings(prev => ({
-      ...prev,
-      [name]: numValue
-    }));
-    
-    console.log(`Slider ${name} finalizado em ${numValue}`);
-  };
-
-  // Função para tratar mudanças nas zonas de detecção
-  const handleZonesChange = (zones) => {
-    setDetectionZones(zones);
-  };
-
-  // Classes reutilizáveis para tema escuro
-  const labelClass = "block text-sm font-medium text-gray-300 mb-1";
-  const inputClass = "mt-1 block w-full pl-3 pr-10 py-2 text-base border-gray-700 bg-gray-700 text-white focus:outline-none focus:ring-blue-500 focus:border-blue-500 rounded-md";
-  const sliderClass = "w-full h-2 bg-gray-700 rounded-lg appearance-none cursor-pointer";
-  const checkboxClass = "focus:ring-blue-500 h-4 w-4 text-blue-600 border-gray-700 bg-gray-700 rounded";
-  const buttonClass = "inline-flex justify-center py-2 px-4 border border-transparent shadow-sm text-sm font-medium rounded-md text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500";
-
-  if (isLoading) {
-    return (
-      <div className="p-4 bg-gray-800 rounded-lg animate-pulse">
-        <div className="h-4 bg-gray-700 rounded w-3/4 mb-4"></div>
-        <div className="h-8 bg-gray-700 rounded mb-4"></div>
-        <div className="h-4 bg-gray-700 rounded w-1/2 mb-4"></div>
-        <div className="h-8 bg-gray-700 rounded mb-4"></div>
-      </div>
-    );
-  }
+  
+  // Lista de classes disponíveis
+  const availableObjectClasses = [
+    { id: "person", label: "Pessoa" },
+    { id: "knife", label: "Faca" },
+    { id: "gun", label: "Arma" },
+    { id: "scissors", label: "Tesoura" },
+    { id: "backpack", label: "Mochila" },
+    { id: "sports ball", label: "Bola" },
+    { id: "bottle", label: "Garrafa" }
+  ];
+  
+  const availableBehaviorClasses = [
+    { id: "aggressive_posture", label: "Postura Agressiva" },
+    { id: "running", label: "Correndo" },
+    { id: "fighting", label: "Briga" },
+    { id: "falling_person", label: "Pessoa Caindo" }
+  ];
 
   return (
-    <div className="bg-gray-800 shadow rounded-lg overflow-hidden">
-      <div className="px-4 py-5 border-b border-gray-700 sm:px-6">
-        <h3 className="text-lg leading-6 font-medium text-white">
-          Configurações de Detecção
-        </h3>
-        <p className="mt-1 text-sm text-gray-400">
-          Ajuste os parâmetros para reduzir falsos positivos e melhorar a precisão.
-        </p>
+    <div className="bg-gray-800 rounded-lg p-4 mt-4">
+      {isLoading ? (
+        <div className="flex justify-center py-4">
+          <div className="animate-spin rounded-full h-8 w-8 border-t-2 border-b-2 border-blue-500"></div>
+        </div>
+      ) : (
+        <>
+          {/* Status da detecção */}
+          <div className="mb-4">
+            <label className="block text-gray-300 mb-2">
+              Status da Detecção
+            </label>
+            <div className="flex items-center">
+              <button
+                onClick={() => handleSettingChange('enabled', !settings.enabled)}
+                className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors focus:outline-none ${
+                  settings.enabled ? 'bg-blue-600' : 'bg-gray-600'
+                }`}
+              >
+                <span
+                  className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
+                    settings.enabled ? 'translate-x-6' : 'translate-x-1'
+                  }`}
+                />
+              </button>
+              <span className="ml-2 text-gray-300">
+                {settings.enabled ? 'Ativada' : 'Desativada'}
+              </span>
+            </div>
       </div>
       
-      <div className="px-4 py-5 sm:p-6 space-y-6">
-        {/* Threshold de Confiança */}
-        <div>
-          <label htmlFor="confidence_threshold" className={labelClass}>
-            Limiar de Confiança: {Math.round(settings.confidence_threshold * 100)}%
+          {/* Threshold de confiança */}
+          <div className="mb-4">
+            <label className="block text-gray-300 mb-2">
+              Limiar de Confiança: {settings.confidence_threshold.toFixed(2)}
           </label>
-          <div className="flex items-center space-x-2">
-            <span className="text-xs text-gray-400">10%</span>
             <input
               type="range"
-              id="confidence_threshold"
-              name="confidence_threshold"
               min="0.1"
-              max="0.95"
+              max="1"
               step="0.05"
               value={settings.confidence_threshold}
-              onChange={handleChange}
-              onTouchEnd={handleSliderTouchEnd}
-              ref={confidenceSliderRef}
-              className={sliderClass}
-              aria-describedby="confidence_help"
+              onChange={(e) => handleSettingChange('confidence_threshold', parseFloat(e.target.value))}
+              className="w-full h-2 bg-gray-700 rounded-lg appearance-none cursor-pointer"
             />
-            <span className="text-xs text-gray-400">95%</span>
+            <div className="flex justify-between text-xs text-gray-400 px-1">
+              <span>0.1</span>
+              <span>0.5</span>
+              <span>1.0</span>
           </div>
-          <p className="mt-1 text-xs text-gray-400" id="confidence_help">
-            Valor mais alto = menos falsos positivos, mas pode perder algumas detecções reais
-          </p>
         </div>
         
-        {/* Sensibilidade de Movimento */}
-        <div>
-          <label htmlFor="motion_sensitivity" className={labelClass}>
-            Sensibilidade ao Movimento: {Math.round(settings.motion_sensitivity * 100)}%
+          {/* Intervalo de detecção */}
+          <div className="mb-4">
+            <label className="block text-gray-300 mb-2">
+              Intervalo de Detecção: {settings.detection_interval} frames
           </label>
-          <div className="flex items-center space-x-2">
-            <span className="text-xs text-gray-400">Baixa</span>
             <input
               type="range"
-              id="motion_sensitivity"
-              name="motion_sensitivity"
-              min="0.1"
-              max="0.9"
-              step="0.1"
-              value={settings.motion_sensitivity}
-              onChange={handleChange}
-              onTouchEnd={handleSliderTouchEnd}
-              ref={motionSliderRef}
-              className={sliderClass}
+              min="1"
+              max="30"
+              step="1"
+              value={settings.detection_interval}
+              onChange={(e) => handleSettingChange('detection_interval', parseInt(e.target.value))}
+              className="w-full h-2 bg-gray-700 rounded-lg appearance-none cursor-pointer"
             />
-            <span className="text-xs text-gray-400">Alta</span>
+            <div className="flex justify-between text-xs text-gray-400 px-1">
+              <span>1</span>
+              <span>15</span>
+              <span>30</span>
           </div>
-          <p className="mt-1 text-xs text-gray-400">
-            Sensibilidade mais baixa ignora pequenos movimentos (folhas, sombras)
-          </p>
         </div>
         
-        {/* Intervalo Mínimo Entre Detecções */}
-        <div>
-          <label htmlFor="min_detection_interval" className={labelClass}>
-            Intervalo Mínimo Entre Detecções (segundos)
+          {/* Classes de objetos */}
+          <div className="mb-4">
+            <label className="block text-gray-300 mb-2">
+              Objetos a Detectar
           </label>
+            <div className="grid grid-cols-2 gap-2">
+              {availableObjectClasses.map(objectClass => (
+                <div key={objectClass.id} className="flex items-center">
           <input
-            type="number"
-            id="min_detection_interval"
-            name="min_detection_interval"
-            min="1"
-            max="60"
-            value={settings.min_detection_interval}
-            onChange={handleChange}
-            className={inputClass}
-          />
-          <p className="mt-1 text-xs text-gray-400">
-            Evita múltiplas notificações para o mesmo objeto
-          </p>
+                    type="checkbox"
+                    id={`object-${objectClass.id}`}
+                    checked={settings.object_classes.includes(objectClass.id)}
+                    onChange={() => toggleObjectClass(objectClass.id)}
+                    className="w-4 h-4 text-blue-600 bg-gray-700 border-gray-600 rounded focus:ring-blue-600"
+                  />
+                  <label
+                    htmlFor={`object-${objectClass.id}`}
+                    className="ml-2 text-sm text-gray-300"
+                  >
+                    {objectClass.label}
+                  </label>
+                </div>
+              ))}
+            </div>
         </div>
         
-        {/* Classes para Detectar */}
-        <div>
-          <span className={labelClass}>Classes de Objetos para Detectar</span>
-          <div className="mt-2 grid grid-cols-2 gap-2">
-            {availableClasses.map(cls => (
-              <div key={cls.value} className="flex items-center">
+          {/* Classes de comportamento */}
+          <div className="mb-4">
+            <label className="block text-gray-300 mb-2">
+              Comportamentos a Detectar
+            </label>
+            <div className="grid grid-cols-2 gap-2">
+              {availableBehaviorClasses.map(behaviorClass => (
+                <div key={behaviorClass.id} className="flex items-center">
                 <input
-                  id={`class-${cls.value}`}
                   type="checkbox"
-                  className={checkboxClass}
-                  checked={settings.detection_classes.includes(cls.value)}
-                  onChange={() => handleClassToggle(cls.value)}
-                />
-                <label htmlFor={`class-${cls.value}`} className="ml-2 text-sm text-gray-300">
-                  {cls.label}
+                    id={`behavior-${behaviorClass.id}`}
+                    checked={settings.behavior_classes.includes(behaviorClass.id)}
+                    onChange={() => toggleBehaviorClass(behaviorClass.id)}
+                    className="w-4 h-4 text-blue-600 bg-gray-700 border-gray-600 rounded focus:ring-blue-600"
+                  />
+                  <label
+                    htmlFor={`behavior-${behaviorClass.id}`}
+                    className="ml-2 text-sm text-gray-300"
+                  >
+                    {behaviorClass.label}
                 </label>
               </div>
             ))}
           </div>
         </div>
         
-        {/* Notificações */}
-        <div>
-          <div className="flex items-center">
+          {/* Ações */}
+          <div className="mb-4">
+            <label className="block text-gray-300 mb-2">
+              Ações
+            </label>
+            <div className="flex items-center mb-2">
             <input
-              id="notifications_enabled"
-              name="notifications_enabled"
               type="checkbox"
-              className={checkboxClass}
-              checked={settings.notifications_enabled}
-              onChange={handleChange}
-            />
-            <label htmlFor="notifications_enabled" className="ml-2 text-sm text-gray-300">
-              Enviar notificações para estas detecções
+                id="alert-on-detection"
+                checked={settings.alert_on_detection}
+                onChange={(e) => handleSettingChange('alert_on_detection', e.target.checked)}
+                className="w-4 h-4 text-blue-600 bg-gray-700 border-gray-600 rounded focus:ring-blue-600"
+              />
+              <label
+                htmlFor="alert-on-detection"
+                className="ml-2 text-sm text-gray-300"
+              >
+                Alertar quando objetos perigosos forem detectados
             </label>
           </div>
         </div>
         
-        {/* Toggle para Configurações Avançadas */}
-        <div className="pt-4 border-t border-gray-700">
+          {/* Botão de salvar */}
+          <div className="mt-6">
           <button
-            type="button"
-            className="text-sm text-blue-400 hover:text-blue-300"
-            onClick={() => setAdvanced(!advanced)}
-          >
-            {advanced ? 'Ocultar configurações avançadas' : 'Mostrar configurações avançadas'}
+              onClick={saveSettings}
+              disabled={isLoading}
+              className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-md"
+            >
+              {isLoading ? 'Salvando...' : 'Salvar Configurações'}
           </button>
         </div>
         
-        {/* Configurações Avançadas */}
-        {advanced && (
-          <div className="space-y-4 pt-4 border-t border-gray-700">
-            <div>
-              <div className="flex items-center">
+          {/* Testes de Detecção */}
+          <div className="mt-8 border-t border-gray-700 pt-4">
+            <h4 className="text-lg font-medium text-white mb-4">Teste de Detecção</h4>
+            
+            <div className="mb-4">
+              <label className="block text-gray-300 mb-2">
+                Upload de Imagem para Teste
+              </label>
                 <input
-                  id="save_all_frames"
-                  name="save_all_frames"
-                  type="checkbox"
-                  className={checkboxClass}
-                  checked={settings.save_all_frames}
-                  onChange={handleChange}
-                />
-                <label htmlFor="save_all_frames" className="ml-2 text-sm text-gray-300">
-                  Salvar todos os frames (consome mais espaço)
-                </label>
-              </div>
+                type="file"
+                accept="image/*"
+                onChange={handleImageChange}
+                className="block w-full text-sm text-gray-300 file:mr-4 file:py-2 file:px-4 file:rounded file:border-0 file:text-sm file:font-medium file:bg-blue-600 file:text-white hover:file:bg-blue-700"
+              />
             </div>
             
-            <div>
-              <span className={labelClass}>Zona de Detecção</span>
-              <div className="bg-gray-700 p-4 rounded-md text-center">
-                <DetectionZone 
-                  imageUrl={cameraPreviewUrl}
-                  initialZones={settings.detectionZones || []}
-                  onChange={handleZonesChange}
-                  readOnly={isLoading}
-                />
+            {testImagePreview && (
+              <div className="mb-4">
+                <p className="text-gray-300 mb-2">Imagem selecionada:</p>
+                <div className="relative">
+                  <img 
+                    src={testImagePreview} 
+                    alt="Preview" 
+                    className="max-h-64 rounded-md" 
+                  />
+                  <button
+                    onClick={handleTestDetection}
+                    disabled={isUploading}
+                    className="mt-2 bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded-md"
+                  >
+                    {isUploading ? 'Processando...' : 'Testar Detecção'}
+                  </button>
+                </div>
               </div>
+            )}
+            
+            {detectionResult && (
+              <div className="mt-4">
+                <h5 className="text-white font-medium mb-2">Resultado da Detecção:</h5>
+                
+                <div className="bg-gray-700 p-3 rounded-md mb-4">
+                  <p className="text-gray-300">
+                    <span className="font-medium">Objetos Detectados:</span> {detectionResult.detections.length}
+                  </p>
+                  <p className="text-gray-300">
+                    <span className="font-medium">Comportamentos:</span> {detectionResult.behaviors.length}
+                  </p>
+                  <p className="text-gray-300">
+                    <span className="font-medium">Tempo de Inferência:</span> {(detectionResult.statistics.inference_time * 1000).toFixed(1)}ms
+                  </p>
             </div>
+                
+                {detectionResult.image_result && (
+                  <div>
+                    <p className="text-gray-300 mb-2">Imagem com detecções:</p>
+                    <img 
+                      src={detectionResult.image_result} 
+                      alt="Detection Result" 
+                      className="max-w-full rounded-md" 
+                    />
           </div>
         )}
         
-        {/* Botões de Ação */}
-        <div className="pt-5 border-t border-gray-700">
-          <div className="flex justify-end">
-            <button
-              type="button"
-              className={buttonClass}
-              onClick={handleSave}
-              disabled={isSaving}
-            >
-              {isSaving ? 'Salvando...' : 'Salvar Configurações'}
-            </button>
+                {detectionResult.detections.length > 0 && (
+                  <div className="mt-4">
+                    <p className="text-white font-medium mb-2">Detecções:</p>
+                    <div className="max-h-60 overflow-y-auto">
+                      {detectionResult.detections.map((detection, index) => (
+                        <div key={index} className={`mb-2 p-2 rounded ${detection.is_dangerous ? 'bg-red-900/40' : 'bg-gray-700'}`}>
+                          <p className="text-gray-300">
+                            <span className="font-medium">Classe:</span> {detection.class_name}
+                          </p>
+                          <p className="text-gray-300">
+                            <span className="font-medium">Confiança:</span> {(detection.confidence * 100).toFixed(1)}%
+                          </p>
+                          {detection.is_dangerous && (
+                            <p className="text-red-400 font-medium">Objeto Perigoso! Severidade: {detection.severity}</p>
+                          )}
+                        </div>
+                      ))}
           </div>
         </div>
+                )}
+              </div>
+            )}
       </div>
+        </>
+      )}
     </div>
   );
 };

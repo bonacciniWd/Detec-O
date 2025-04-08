@@ -273,3 +273,4 @@ backend/
 
 - **Problema**: Baixa precisão em ambientes com pouca luz
 - **Solução**: Pré-processamento de imagem, modelos específicos para baixa luminosidade 
+
