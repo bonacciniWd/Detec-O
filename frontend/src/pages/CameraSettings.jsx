@@ -1,7 +1,9 @@
 import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
-import apiClient from '../services/api';
+// Remover apiClient se não for mais usado
+// import apiClient from '../services/api';
+import cameraService from '../services/cameraService'; // Importar cameraService
 import { toast } from 'react-toastify';
 import DetectionSettings from '../components/DetectionSettings';
 import AIModelSelector from '../components/AIModelSelector';
@@ -25,7 +27,7 @@ const CameraSettings = () => {
     password: '',
     ip_address: '',
     port: 80,
-    connector_type: 'onvif'
+    connector_type: 'rtsp'
   });
 
   useEffect(() => {
@@ -33,18 +35,20 @@ const CameraSettings = () => {
       try {
         setLoading(true);
         
-        // Usar o método específico para obter detalhes do dispositivo
-        const cameraData = await apiClient.getDevice(deviceId);
+        // Usar a função correta do cameraService
+        const cameraData = await cameraService.getCamera(deviceId);
         
         setCamera(cameraData);
+        // Ajustar preenchimento do formData se os nomes dos campos retornados mudaram
         setFormData({
           name: cameraData.name || '',
           location: cameraData.location || '',
           username: cameraData.username || '',
-          password: '',  // Não preenchemos a senha por segurança
+          password: '', // Manter vazio
+          // Usar os campos retornados pela API (ip_address, port)
           ip_address: cameraData.ip_address || '',
           port: cameraData.port || 80,
-          connector_type: cameraData.connector_type || 'onvif'
+          connector_type: cameraData.connector_type || 'rtsp' // Ajustar default se necessário
         });
         setLoading(false);
       } catch (err) {
@@ -71,18 +75,29 @@ const CameraSettings = () => {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
+    setError(null); // Limpar erro anterior
+    setLoading(true);
+    
     try {
-      setLoading(true);
+      // Preparar dados para enviar (usando o estado atual do formData)
+      // O cameraService.updateCamera já filtra os campos (name, location, etc.)
+      console.log("Enviando dados para atualização:", formData); 
       
-      // Usar o método específico para atualizar o dispositivo
-      await apiClient.updateDevice(deviceId, formData);
+      await cameraService.updateCamera(deviceId, formData);
       
       setLoading(false);
-      toast.success('Configurações da câmera atualizadas com sucesso');
-      navigate('/cameras'); // Redirecionar para a lista de câmeras
+      toast.success('Configurações da câmera atualizadas com sucesso!');
+      // Opcional: Redirecionar ou apenas mostrar sucesso
+      // navigate('/cameras'); 
+
     } catch (err) {
       console.error('Error updating camera:', err);
-      setError('Não foi possível atualizar a câmera. Tente novamente mais tarde.');
+      const detail = err.response?.data?.detail;
+      const errorMessage = typeof detail === 'string' 
+                           ? detail 
+                           : 'Não foi possível atualizar a câmera. Tente novamente mais tarde.';
+      setError(errorMessage);
+      toast.error(`Erro ao atualizar: ${errorMessage}`);
       setLoading(false);
     }
   };
@@ -91,7 +106,8 @@ const CameraSettings = () => {
     if (window.confirm('Tem certeza que deseja excluir esta câmera?')) {
       try {
         setLoading(true);
-        await apiClient.deleteDevice(deviceId);
+        // Usar a função correta do cameraService
+        await cameraService.deleteCamera(deviceId);
         setLoading(false);
         navigate('/cameras'); // Redirecionar para a lista de câmeras
         toast.success('Câmera excluída com sucesso');

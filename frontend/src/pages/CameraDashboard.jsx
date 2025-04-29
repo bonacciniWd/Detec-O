@@ -1,11 +1,11 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
-import CameraSnapshot from '../components/CameraSnapshot';
 import StreamModal from '../components/StreamModal';
-import { FaPlus, FaSearch, FaSync, FaList, FaThLarge, FaCog, FaTrash, FaPen } from 'react-icons/fa';
-import apiClient from '../services/api';
+import { FaPlus, FaSearch, FaSync, FaList, FaThLarge, FaCog, FaTrash, FaPen, FaPlay, FaStop, FaCircle } from 'react-icons/fa';
+import cameraService from '../services/cameraService';
 import { toast } from 'react-toastify';
+import LiveSnapshotImage from '../components/LiveSnapshotImage';
 
 const CameraDashboard = () => {
   const { token } = useAuth();
@@ -33,14 +33,18 @@ const CameraDashboard = () => {
     deviceName: ''
   });
 
+  // Novo estado para rastrear status de processamento
+  const [processingStatus, setProcessingStatus] = useState({}); // { cameraId: { is_running: boolean, last_error: string | null } }
+  const [actionLoading, setActionLoading] = useState({}); // Para loading individual dos botões start/stop { cameraId: true/false }
+
   // Buscar dispositivos/câmeras do usuário
   useEffect(() => {
     const fetchDevices = async () => {
       try {
         setLoading(true);
         
-        // Usar o método específico para obter lista de dispositivos
-        const devices = await apiClient.getDevices();
+        // Usar o cameraService para obter câmeras
+        const devices = await cameraService.getCameras();
         
         setDevices(devices);
         setLoading(false);
@@ -62,9 +66,10 @@ const CameraDashboard = () => {
       for (const device of devices) {
         try {
           // Usar o método específico para obter streams de dispositivos
-          const streams = await apiClient.getDeviceStreams(device.id);
-          
-          streamsMap[device.id] = streams;
+          // Comentado temporariamente pois a API não existe
+          // const streams = await cameraService.getDeviceStreams(device.id);
+          // streamsMap[device.id] = streams;
+          streamsMap[device.id] = []; // Definir como array vazio por enquanto
         } catch (err) {
           console.error(`Erro ao buscar streams para dispositivo ${device.id}:`, err);
           streamsMap[device.id] = [];
@@ -125,7 +130,7 @@ const CameraDashboard = () => {
   // Confirmar exclusão de câmera
   const confirmDeleteCamera = async () => {
     try {
-      await apiClient.deleteDevice(deleteConfirmation.deviceId);
+      await cameraService.deleteDevice(deleteConfirmation.deviceId);
       toast.success(`Câmera "${deleteConfirmation.deviceName}" excluída com sucesso`);
       
       // Atualizar a lista de dispositivos removendo o excluído
@@ -146,6 +151,39 @@ const CameraDashboard = () => {
   // Manipular edição de câmera
   const handleEditCamera = (deviceId) => {
     navigate(`/camera/${deviceId}`);
+  };
+
+  // --- Handlers para Start/Stop --- 
+  const handleStartProcessing = async (deviceId) => {
+    setActionLoading(prev => ({ ...prev, [deviceId]: true }));
+    try {
+      const status = await cameraService.startProcessing(deviceId);
+      setProcessingStatus(prev => ({ ...prev, [deviceId]: status }));
+      toast.success(`Processamento iniciado para câmera ${deviceId}`);
+    } catch (error) {
+      const detail = error.response?.data?.detail || 'Erro desconhecido';
+      setProcessingStatus(prev => ({ ...prev, [deviceId]: { is_running: false, last_error: detail } }));
+      toast.error(`Erro ao iniciar: ${detail}`);
+    } finally {
+      setActionLoading(prev => ({ ...prev, [deviceId]: false }));
+    }
+  };
+
+  const handleStopProcessing = async (deviceId) => {
+    setActionLoading(prev => ({ ...prev, [deviceId]: true }));
+    try {
+      const status = await cameraService.stopProcessing(deviceId);
+      // A resposta do stop pode já indicar is_running: false
+      setProcessingStatus(prev => ({ ...prev, [deviceId]: { ...status, is_running: false } })); 
+      toast.info(`Processamento parado para câmera ${deviceId}`);
+    } catch (error) {
+      const detail = error.response?.data?.detail || 'Erro desconhecido';
+       // Mesmo com erro ao parar, assumir que parou ou está em estado inconsistente
+      setProcessingStatus(prev => ({ ...prev, [deviceId]: { is_running: false, last_error: `Erro ao parar: ${detail}` } }));
+      toast.error(`Erro ao parar: ${detail}`);
+    } finally {
+      setActionLoading(prev => ({ ...prev, [deviceId]: false }));
+    }
   };
 
   // Renderizar lista de câmeras
@@ -199,140 +237,77 @@ const CameraDashboard = () => {
     return (
       <div className={viewMode === 'grid' ? 'grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4' : 'space-y-4'}>
         {filteredDevices.map(device => {
-          // Pegar o primeiro stream disponível para este dispositivo
-          const deviceStreams = streams[device.id] || [];
-          const primaryStream = deviceStreams.length > 0 ? deviceStreams[0] : null;
-          
-          if (!primaryStream) {
-            // Mostrar um dispositivo sem streams
-            return (
-              <div 
-                key={device.id} 
-                className="bg-gray-800 rounded-lg shadow overflow-hidden border border-gray-700 text-gray-200"
-              >
-                <div className="p-4">
-                  <div className="flex items-center justify-between mb-2">
-                    <h3 className="text-lg font-medium">{device.name}</h3>
-                    <div className="flex items-center space-x-2">
-                      <span className={`status-indicator ${device.status === 'online' ? 'status-online' : 'status-offline'}`}></span>
-                      <button 
-                        onClick={() => handleEditCamera(device.id)}
-                        className="p-1 text-gray-400 hover:text-blue-400"
-                        title="Editar câmera"
-                      >
-                        <FaPen size={14} />
-                      </button>
-                      <button 
-                        onClick={() => handleDeleteCamera(device.id, device.name)}
-                        className="p-1 text-gray-400 hover:text-red-400"
-                        title="Excluir câmera"
-                      >
-                        <FaTrash size={14} />
-                      </button>
-                    </div>
-                  </div>
-                  <p className="text-sm text-gray-400">{device.manufacturer} {device.model}</p>
-                  <p className="text-xs text-gray-500">{device.ip_address}</p>
-                  <div className="mt-4 p-8 bg-gray-700 rounded flex items-center justify-center">
-                    <p className="text-gray-400">Nenhum stream disponível</p>
-                  </div>
-                </div>
-              </div>
-            );
-          }
-          
-          // Mostrar dispositivo com snapshot
+          const currentStatus = processingStatus[device.id] || { is_running: false, last_error: null };
+          const isLoadingAction = actionLoading[device.id];
+
           return (
             <div 
               key={device.id} 
               className="bg-gray-800 rounded-lg shadow overflow-hidden border border-gray-700 text-gray-200"
             >
-              {viewMode === 'grid' ? (
-                <>
-                  <div className="relative">
-                    <CameraSnapshot 
-                      deviceId={device.id}
-                      streamId={primaryStream.id}
-                      cameraName={device.name}
-                      interval={refreshInterval}
-                      onExpand={handleCameraExpand}
-                      onError={handleCameraError}
-                      showControls={true}
-                      autoRefresh={true}
-                    />
-                    <div className="absolute top-2 right-2 flex space-x-1">
-                      <button 
-                        onClick={() => handleEditCamera(device.id)}
-                        className="p-1 bg-gray-900 bg-opacity-70 text-white rounded hover:bg-opacity-90"
-                        title="Editar câmera"
-                      >
-                        <FaPen size={12} />
-                      </button>
-                      <button 
-                        onClick={() => handleDeleteCamera(device.id, device.name)}
-                        className="p-1 bg-gray-900 bg-opacity-70 text-white rounded hover:bg-opacity-90"
-                        title="Excluir câmera"
-                      >
-                        <FaTrash size={12} />
-                      </button>
-                    </div>
+              {/* Lógica de exibição (Grid vs List) - Manteremos o Snapshot em ambos? */}
+              {/* Exemplo SIMPLIFICADO mostrando snapshot no topo para ambos os modos */}
+              <div className="w-full bg-gray-700 flex items-center justify-center text-gray-400 aspect-video"> {/* Aspect ratio */}
+                <LiveSnapshotImage 
+                  cameraId={device.id}
+                  interval={refreshInterval}
+                  className="w-full h-full"
+                />
+              </div>
+              
+              {/* Informações e Ações abaixo do snapshot */} 
+              <div className="p-4">
+                <div className="flex items-center justify-between mb-2">
+                  {/* Status Indicator + Nome */}
+                  <div className="flex items-center min-w-0">
+                     <FaCircle 
+                        className={`mr-2 flex-shrink-0 ${currentStatus.is_running ? 'text-green-500 animate-pulse' : 'text-red-500'}`}
+                        size={10}
+                        title={currentStatus.is_running ? 'Processando' : 'Parado'}
+                     />
+                    <h3 className="text-lg font-medium truncate" title={device.name}>{device.name}</h3>
                   </div>
-                </>
-              ) : (
-                <div className="flex">
-                  <div className="w-48">
-                    <CameraSnapshot 
-                      deviceId={device.id}
-                      streamId={primaryStream.id}
-                      cameraName={device.name}
-                      interval={refreshInterval}
-                      onExpand={handleCameraExpand}
-                      onError={handleCameraError}
-                      showControls={false}
-                      autoRefresh={true}
-                    />
-                  </div>
-                  <div className="p-4 flex-1">
-                    <div className="flex items-center justify-between mb-2">
-                      <h3 className="text-lg font-medium">{device.name}</h3>
-                      <div className="flex items-center space-x-2">
-                        <span className={`status-indicator ${device.status === 'online' ? 'status-online' : 'status-offline'}`}></span>
-                        <button 
-                          onClick={() => handleEditCamera(device.id)}
-                          className="p-1 text-gray-400 hover:text-blue-400"
-                          title="Editar câmera"
-                        >
-                          <FaPen size={14} />
-                        </button>
-                        <button 
-                          onClick={() => handleDeleteCamera(device.id, device.name)}
-                          className="p-1 text-gray-400 hover:text-red-400"
-                          title="Excluir câmera"
-                        >
-                          <FaTrash size={14} />
-                        </button>
-                      </div>
-                    </div>
-                    <p className="text-sm text-gray-400">{device.manufacturer} {device.model}</p>
-                    <p className="text-xs text-gray-500">{device.ip_address}</p>
-                    <div className="mt-2 flex">
-                      <button 
-                        onClick={() => handleCameraExpand(device.id, primaryStream.id, device.name)}
-                        className="text-xs text-blue-400 hover:underline"
-                      >
-                        Ver Stream
-                      </button>
-                      <span className="mx-2 text-gray-600">|</span>
-                      <button 
-                        onClick={() => navigate(`/camera/${device.id}`)}
-                        className="text-xs text-blue-400 hover:underline"
-                      >
-                        Configurações
-                      </button>
-                    </div>
+                   {/* Botões de Ação (Edit/Delete) */}
+                  <div className="flex items-center space-x-1 flex-shrink-0">
+                    {/* Botão Start/Stop */} 
+                    <button
+                      onClick={() => currentStatus.is_running ? handleStopProcessing(device.id) : handleStartProcessing(device.id)}
+                      disabled={isLoadingAction}
+                      className={`p-1.5 rounded ${currentStatus.is_running 
+                                      ? 'bg-red-600 hover:bg-red-700' 
+                                      : 'bg-green-600 hover:bg-green-700'} 
+                                   text-white disabled:opacity-50`}
+                      title={currentStatus.is_running ? 'Parar Detecção' : 'Iniciar Detecção'}
+                    >
+                      {isLoadingAction ? 
+                        <FaCog className="animate-spin" size={12}/> : 
+                        (currentStatus.is_running ? <FaStop size={12}/> : <FaPlay size={12}/>)
+                      }
+                    </button>
+                    <button 
+                      onClick={() => handleEditCamera(device.id)}
+                      className="p-1.5 bg-gray-700 text-gray-300 rounded hover:bg-gray-600"
+                      title="Editar Configurações"
+                    >
+                      <FaPen size={12} />
+                    </button>
+                    <button 
+                      onClick={() => handleDeleteCamera(device.id, device.name)}
+                      className="p-1.5 bg-gray-700 text-gray-300 rounded hover:bg-gray-600"
+                      title="Excluir Câmera"
+                    >
+                      <FaTrash size={12} />
+                    </button>
                   </div>
                 </div>
-              )}
+                {/* IP/Porta */} 
+                <p className="text-xs text-gray-500 truncate" title={device.ip_address}>{device.ip_address}:{device.port}</p>
+                {/* Exibir último erro se houver e não estiver rodando */}
+                {!currentStatus.is_running && currentStatus.last_error && (
+                    <p className="text-xs text-red-400 mt-1 truncate" title={currentStatus.last_error}>Erro: {currentStatus.last_error}</p>
+                )}
+              </div>
+
             </div>
           );
         })}

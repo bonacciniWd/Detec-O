@@ -113,9 +113,17 @@ function EventsPage() {
       const data = await eventService.getEvents(params);
       
       // Atualizar estados com os dados recebidos
-      setEvents(data.events || []);
-      setTotalPages(data.total_pages || 1);
-      setTotalEvents(data.total_events || 0);
+      if (Array.isArray(data)) {
+        setEvents(data);
+        // TODO: Implementar paginação na API e descomentar/ajustar abaixo
+        // setTotalEvents(data.length); // Placeholder, API precisa retornar total real
+        // setTotalPages(Math.ceil(data.length / eventsPerPage)); // Placeholder
+      } else {
+        console.error("API de eventos não retornou um array:", data);
+        setEvents([]);
+        // setTotalEvents(0);
+        // setTotalPages(1);
+      }
       
       // Buscar câmeras se ainda não foram carregadas
       if (Object.keys(cameras).length === 0) {

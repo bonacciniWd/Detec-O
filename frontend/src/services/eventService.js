@@ -1,42 +1,133 @@
 import api from './api';
 
 /**
- * Serviço para gerenciar eventos do sistema
+ * Serviço para gerenciamento de eventos
  */
+
+// Mock de dados para eventos caso a API real ainda não esteja implementada
+const mockEvents = [
+  {
+    id: '101',
+    event_type: 'Pessoa',
+    camera_id: '1',
+    camera_name: 'Câmera Entrada',
+    timestamp: new Date().toISOString(),
+    confidence: 0.87,
+    severity: 'yellow',
+    zone_name: 'Entrada Principal'
+  },
+  {
+    id: '102',
+    event_type: 'Veículo',
+    camera_id: '2',
+    camera_name: 'Câmera Estacionamento',
+    timestamp: new Date(Date.now() - 15 * 60 * 1000).toISOString(),
+    confidence: 0.92,
+    severity: 'blue',
+    zone_name: 'Estacionamento'
+  },
+  {
+    id: '103',
+    event_type: 'Objeto Abandonado',
+    camera_id: '1',
+    camera_name: 'Câmera Entrada',
+    timestamp: new Date(Date.now() - 45 * 60 * 1000).toISOString(),
+    confidence: 0.78,
+    severity: 'red',
+    zone_name: 'Entrada Principal'
+  },
+  {
+    id: '104',
+    event_type: 'Pessoa',
+    camera_id: '1',
+    camera_name: 'Câmera Entrada',
+    timestamp: new Date(Date.now() - 2 * 60 * 60 * 1000).toISOString(),
+    confidence: 0.85,
+    severity: 'yellow',
+    zone_name: 'Entrada Principal'
+  },
+  {
+    id: '105',
+    event_type: 'Movimento',
+    camera_id: '2',
+    camera_name: 'Câmera Estacionamento',
+    timestamp: new Date(Date.now() - 3 * 60 * 60 * 1000).toISOString(),
+    confidence: 0.65,
+    severity: 'blue',
+    zone_name: 'Estacionamento'
+  }
+];
+
 const eventService = {
   /**
-   * Obtém a lista de eventos com opções de filtragem e paginação
-   * @param {Object} options - Opções de consulta
-   * @param {number} options.limit - Quantidade de eventos a retornar
-   * @param {number} options.offset - Índice inicial para paginação
-   * @param {string} options.sort - Campo para ordenação (ex: '-timestamp' para decrescente por data)
-   * @param {string} options.type - Filtrar por tipo de evento
-   * @param {string} options.cameraId - Filtrar por ID da câmera
-   * @param {string} options.status - Filtrar por status (pending, confirmed, false_alarm)
-   * @returns {Promise<Array>} - Array de eventos
+   * Obtém lista de eventos com filtros
+   * @param {Object} filters - Objeto com filtros: camera_id, start_date, end_date, limit, event_type, severity
+   * @returns {Promise<Array>} Lista de eventos
    */
-  getEvents: async function(options = {}) {
+  getEvents: async (filters = {}) => {
     try {
-      const response = await api.get('/v1/events', { params: options });
-      return response.data.items || response.data || [];
+      console.log("Buscando eventos com filtros:", filters);
+      
+      const response = await api.get('/api/events/', { params: filters });
+      
+      if (response.data && Array.isArray(response.data)) {
+        console.log("Dados de eventos obtidos da API:", response.data.length);
+        return response.data;
+      } else if (response.data && response.data.events && Array.isArray(response.data.events)) {
+        console.log("Dados de eventos obtidos da API (formato alternativo):", response.data.events.length);
+        return response.data.events;
+      } else {
+        // Verifica se a resposta é HTML
+        const isHtmlResponse = typeof response.data === 'string' && 
+          (response.data.toLowerCase().startsWith('<!doctype') || 
+           response.data.toLowerCase().startsWith('<html'));
+           
+        if (isHtmlResponse) {
+          console.warn("API retornou formato HTML desconhecido");
+        } else {
+          console.warn("API retornou formato desconhecido:", response.data);
+        }
+        
+        return []; // Retorna array vazio se formato for desconhecido
+      }
     } catch (error) {
-      console.error('Erro ao buscar eventos:', error);
-      throw error;
+      console.error("Erro ao buscar eventos:", error.response?.data || error.message);
+      throw error; // Re-lança o erro para ser tratado no componente
     }
   },
-
+  
   /**
-   * Obtém os detalhes de um evento específico
+   * Obtém detalhes de um evento específico
    * @param {string} eventId - ID do evento
-   * @returns {Promise<Object>} - Dados do evento
+   * @returns {Promise<Object>} Detalhes do evento
    */
-  getEventById: async function(eventId) {
+  getEventById: async (eventId) => {
     try {
-      const response = await api.get(`/v1/events/${eventId}`);
+      const response = await api.get(`/api/events/${eventId}`);
       return response.data;
     } catch (error) {
-      console.error(`Erro ao buscar evento ${eventId}:`, error);
-      throw error;
+      console.error(`Erro ao buscar evento ${eventId}:`, error.response?.data || error.message);
+      throw error; // Re-lança o erro para ser tratado no componente
+    }
+  },
+  
+  /**
+   * Adiciona feedback a um evento (confirmação ou falso alarme)
+   * @param {string} eventId - ID do evento
+   * @param {boolean} isConfirmed - Se o evento foi confirmado como verdadeiro
+   * @param {string} feedback - Comentário opcional
+   * @returns {Promise<Object>} Status da operação
+   */
+  addFeedback: async (eventId, isConfirmed, feedback = '') => {
+    try {
+      const response = await api.post(`/api/events/${eventId}/feedback`, {
+        is_confirmed: isConfirmed,
+        feedback
+      });
+      return response.data;
+    } catch (error) {
+      console.error("Erro ao adicionar feedback:", error.response?.data || error.message);
+      throw error; // Re-lança o erro para ser tratado no componente
     }
   },
 
@@ -49,7 +140,7 @@ const eventService = {
    */
   updateEventStatus: async function(eventId, status, comment = '') {
     try {
-      const response = await api.patch(`/v1/events/${eventId}`, { 
+      const response = await api.patch(`/api/events/${eventId}`, { 
         status,
         comment
       });
@@ -67,7 +158,7 @@ const eventService = {
    */
   deleteEvent: async function(eventId) {
     try {
-      await api.delete(`/v1/events/${eventId}`);
+      await api.delete(`/api/events/${eventId}`);
       return true;
     } catch (error) {
       console.error(`Erro ao excluir evento ${eventId}:`, error);
@@ -82,7 +173,7 @@ const eventService = {
    */
   getEventStats: async function(options = {}) {
     try {
-      const response = await api.get('/v1/events/stats', { params: options });
+      const response = await api.get('/api/events/stats', { params: options });
       return response.data;
     } catch (error) {
       console.error('Erro ao buscar estatísticas de eventos:', error);

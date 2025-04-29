@@ -26,7 +26,7 @@ def create_app():
     app.add_middleware(
         CORSMiddleware,
         # Permitir a origem do frontend Vite e a origem antiga (se necessário)
-        allow_origins=["http://localhost:5173", "http://localhost:5000"],
+        allow_origins=["http://localhost:5173", "http://localhost:5000", "https://detec-o.com.br", "*"],
         allow_credentials=True,
         allow_methods=["*"], # Permitir todos os métodos
         allow_headers=["*"], # Permitir todos os cabeçalhos

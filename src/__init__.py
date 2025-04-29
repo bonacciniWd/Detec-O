@@ -29,17 +29,18 @@ logger = logging.getLogger(__name__)
 # Sistema de Detecção de Crimes
 from .api import api_router, auth_router
 from .detection import analyze_hand_movements
-from .db import init_db, save_detection_event, get_detection_events, close_db
+# Importando as funções atualizadas do módulo db 
+from .db import get_db, save_detection_event, get_detection_events, get_db_session
 from .utils import load_config, get_cameras
 
 __all__ = [
     'api_router',
     'auth_router',
     'analyze_hand_movements',
-    'init_db',
+    'get_db',
+    'get_db_session',
     'save_detection_event', 
     'get_detection_events',
-    'close_db',
     'load_config',
     'get_cameras'
 ] 

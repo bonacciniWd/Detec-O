@@ -1,5 +1,13 @@
-import React, { useState, useRef } from 'react';
-import eventService from '../services/eventService';
+import React, { useState, useRef, useEffect } from 'react';
+import PropTypes from 'prop-types';
+// Remover import do eventService se não for mais usado
+// import eventService from '../services/eventService';
+
+// Helper para extrair nome do arquivo do path completo (ADICIONADO AQUI)
+const getSnapshotFilename = (fullPath) => {
+    if (!fullPath || typeof fullPath !== 'string') return null;
+    return fullPath.split(/\/|\\\\/).pop(); // Funciona para / e \\
+};
 
 /**
  * Componente avançado para visualização de imagens de eventos
@@ -21,8 +29,9 @@ const EventImage = ({
   const [isZoomed, setIsZoomed] = useState(false);
   const imageRef = useRef(null);
   
-  // Construir URL da imagem
-  const imageUrl = `${eventService.getApiBaseUrl()}/v1/events/${eventId}/image`;
+  // Construir URL da imagem a partir do image_path do evento
+  const snapshotFilename = getSnapshotFilename(eventData?.image_path);
+  const imageUrl = snapshotFilename ? `/snapshots/${snapshotFilename}` : null;
   
   // Classe CSS para a largura da imagem
   const widthClass = {
@@ -45,12 +54,21 @@ const EventImage = ({
   // Fallback image (SVG em base64) para quando a imagem não carregar
   const fallbackImageSrc = 'data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMjAwIiBoZWlnaHQ9IjE1MCIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj48cmVjdCB3aWR0aD0iMjAwIiBoZWlnaHQ9IjE1MCIgZmlsbD0iIzNiNDI1MiIvPjx0ZXh0IHg9IjUwJSIgeT0iNTAlIiBkb21pbmFudC1iYXNlbGluZT0ibWlkZGxlIiB0ZXh0LWFuY2hvcj0ibWlkZGxlIiBmb250LWZhbWlseT0ibW9ub3NwYWNlIiBmb250LXNpemU9IjE2cHgiIGZpbGw9IiM5ZmEzYjEiPkltYWdlbSBuYW8gZGlzcG9uaXZlbDwvdGV4dD48L3N2Zz4=';
   
+  // Resetar estado quando eventId ou eventData mudar
+  useEffect(() => {
+      setIsLoading(true);
+      setHasError(false);
+      // Forçar recarregamento da imagem se a URL mudar (ou for nula)
+      // A chave na tag img também pode ajudar se eventId for usado como key
+  }, [imageUrl]); 
+  
   const handleImageLoad = () => {
     setIsLoading(false);
     setHasError(false);
   };
   
   const handleImageError = () => {
+    console.warn(`Falha ao carregar snapshot: ${imageUrl}`);
     setIsLoading(false);
     setHasError(true);
   };
@@ -108,21 +126,26 @@ const EventImage = ({
         </div>
       )}
       
-      {hasError && (
-        <div className="absolute inset-0 flex items-center justify-center bg-gray-100 dark:bg-gray-800 text-center p-4">
-          <p className="text-red-500 text-sm">{`Não foi possível carregar a imagem do evento: ${error}`}</p>
+      {/* Exibir erro ou fallback se a URL for nula ou der erro */}
+      {(hasError || !imageUrl) && (
+        <div className="absolute inset-0 flex items-center justify-center bg-gray-700 text-center p-4">
+          <p className="text-gray-400 text-sm">Snapshot indisponível</p>
         </div>
       )}
       
-      <img
-        ref={imageRef}
-        src={imageUrl}
-        alt={imageAltText}
-        className={`${widthClass} ${heightClass} rounded ${hasError ? 'hidden' : 'block'} ${fullWidth ? '' : 'max-h-[400px] object-contain'}`}
-        onLoad={handleImageLoad}
-        onError={handleImageError}
-        onClick={onClick}
-      />
+      {/* Renderizar imagem apenas se a URL existir e não houver erro */}
+      {!hasError && imageUrl && (
+        <img
+          ref={imageRef}
+          key={imageUrl} // Adicionar key para forçar reload se URL mudar
+          src={imageUrl}
+          alt={imageAltText}
+          className={`${widthClass} ${heightClass} rounded ${hasError ? 'hidden' : 'block'} ${fullWidth ? '' : 'max-h-[400px] object-contain'}`}
+          onLoad={handleImageLoad}
+          onError={handleImageError}
+          onClick={onClick}
+        />
+      )}
       
       {/* Container para as bounding boxes */}
       {!isLoading && !hasError && renderBoundingBoxes()}
@@ -173,5 +196,7 @@ const EventImage = ({
     </div>
   );
 };
+
+// ... (propTypes) ...
 
 export default EventImage; 

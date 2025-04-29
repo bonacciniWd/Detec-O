@@ -1,9 +1,10 @@
-# Script para iniciar o backend do Sistema de Detecção de Crimes
+# Script para iniciar o backend
+Write-Host "Iniciando API Detec-O..."
 
-# Ativar ambiente virtual se existir
-if (Test-Path ".\venv") {
-    .\venv\Scripts\Activate.ps1
-}
+# Ativar o ambiente virtual (opcional)
+# .\venv\Scripts\Activate
 
-# Iniciar o backend
-python -m uvicorn src.main:app --host 0.0.0.0 --port 8080 --reload 
+# Executar o FastAPI com uvicorn
+uvicorn api.main:app --reload --port 8000
+
+Write-Host "Servidor encerrado." 

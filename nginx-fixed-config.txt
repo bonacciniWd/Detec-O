@@ -1,76 +1,76 @@
 server {
     listen 80;
-    listen [::]:80;
     server_name detec-o.com.br www.detec-o.com.br;
 
-    return 301 https://$host$request_uri;
+    # Redirecionar HTTP para HTTPS
+    location / {
+        return 301 https://$host$request_uri;
+    }
 }
 
 server {
-    listen 443 ssl http2;
-    listen [::]:443 ssl http2;
+    listen 443 ssl;
     server_name detec-o.com.br www.detec-o.com.br;
 
+    # Configurações SSL
     ssl_certificate /etc/letsencrypt/live/detec-o.com.br/fullchain.pem;
     ssl_certificate_key /etc/letsencrypt/live/detec-o.com.br/privkey.pem;
+    ssl_protocols TLSv1.2 TLSv1.3;
+    ssl_prefer_server_ciphers on;
+    ssl_ciphers ECDHE-RSA-AES256-GCM-SHA512:DHE-RSA-AES256-GCM-SHA512:ECDHE-RSA-AES256-GCM-SHA384:DHE-RSA-AES256-GCM-SHA384:ECDHE-RSA-AES256-SHA384;
+    ssl_session_timeout 10m;
+    ssl_session_cache shared:SSL:10m;
+    ssl_session_tickets off;
+    ssl_stapling on;
+    ssl_stapling_verify on;
 
-    # Raiz do frontend
-    root /var/www/detec-o;
+    # Configurações de buffer
+    client_max_body_size 10M;
+    
+    # Raiz para arquivos estáticos do frontend
+    root /var/www/deteco/frontend/dist;
     index index.html;
 
-    # Configuração de MIME types
-    include /etc/nginx/mime.types;
-    types {
-        application/javascript js;
-    }
-    default_type application/octet-stream;
-
-    # Desabilitar verificação de permissões específicas
-    autoindex off;
-    disable_symlinks off;
-
-    # CORS aberto para todos
-    add_header Access-Control-Allow-Origin '*' always;
-    
-    # Regra específica para arquivos JavaScript
-    location ~ \.js$ {
-        add_header Content-Type application/javascript;
-        add_header X-Content-Type-Options nosniff;
-        add_header Access-Control-Allow-Origin '*' always;
-        
-        # Garantir que todos os arquivos sejam servidos
-        try_files $uri =404;
-    }
-    
-    # Servir arquivos de assets diretamente
-    location /assets/ {
-        alias /var/www/detec-o/assets/;
-        expires max;
-        add_header Cache-Control 'public, max-age=31536000';
-        add_header Access-Control-Allow-Origin '*' always;
-    }
-    
-    # Single Page Application
+    # Servir arquivos estáticos do frontend
     location / {
         try_files $uri $uri/ /index.html;
     }
-    
-    # API proxying
+
+    # API - Rotas para o backend (FastAPI)
+    # Encaminhar todas as requisições /api/ para o backend
     location /api/ {
-        proxy_pass http://127.0.0.1:8080;
-        proxy_http_version 1.1;
-        proxy_set_header Upgrade $http_upgrade;
-        proxy_set_header Connection 'upgrade';
+        proxy_pass http://localhost:8080/;
         proxy_set_header Host $host;
-        proxy_cache_bypass $http_upgrade;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
     }
-    
-    location /auth/ {
-        proxy_pass http://127.0.0.1:8080;
+
+    # Rotas de autenticação - encaminhar diretamente para o backend
+    location ~ ^/(auth|v1/auth|api/v1/auth|api/auth)/ {
+        proxy_pass http://localhost:8080;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+    }
+
+    # Configurações para WebSockets
+    location /ws/ {
+        proxy_pass http://localhost:8080;
         proxy_http_version 1.1;
         proxy_set_header Upgrade $http_upgrade;
-        proxy_set_header Connection 'upgrade';
+        proxy_set_header Connection "upgrade";
         proxy_set_header Host $host;
-        proxy_cache_bypass $http_upgrade;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+    }
+
+    # Servir arquivos de vídeo/imagem diretamente
+    location /media/ {
+        alias /var/www/deteco/media/;
+        expires 30d;
+        add_header Cache-Control "public, max-age=2592000";
     }
 } 

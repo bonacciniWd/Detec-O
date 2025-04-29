@@ -1,8 +1,19 @@
 import React, { useState, useEffect } from 'react';
 import PropTypes from 'prop-types';
-import axios from 'axios';
-import apiClient from '../services/api';
+// import axios from 'axios'; // Remover se não usado diretamente
+// import apiClient from '../services/api'; // Remover
+import cameraService from '../services/cameraService'; // Importar
 import { toast } from 'react-toastify';
+
+// Lista fixa de modelos disponíveis (AJUSTADA)
+const availableModels = [
+    // Manter apenas os modelos que existem em api/ai_models/
+    // Exemplo: Se só temos o yolov8s.pt
+    { id: "yolov8s.pt", name: "YOLOv8 Small", description: "Bom equilíbrio entre velocidade e precisão.", classes: ["pessoa", "carro"], size_mb: 22, speed_rating: "Médio-Alto" },
+    // Comentar ou remover os outros que não estão disponíveis no backend agora
+    // { id: "yolov8n.pt", name: "YOLOv8 Nano", description: "Leve e rápido, bom para CPUs ou edge.", classes: ["pessoa", "carro"], size_mb: 6, speed_rating: "Alto" },
+    // { id: "yolov8m.pt", name: "YOLOv8 Medium", description: "Mais preciso, requer mais recursos.", classes: ["pessoa", "carro"], size_mb: 50, speed_rating: "Médio" },
+];
 
 /**
  * Componente para selecionar e configurar modelos de IA para uma câmera específica
@@ -10,49 +21,46 @@ import { toast } from 'react-toastify';
 const AIModelSelector = ({ cameraId, onSave }) => {
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState(null);
-  const [models, setModels] = useState([]);
-  const [selectedModel, setSelectedModel] = useState('');
+  const [models, setModels] = useState(availableModels);
+  const [selectedModel, setSelectedModel] = useState(availableModels.length > 0 ? availableModels[0].id : '');
   const [currentSettings, setCurrentSettings] = useState({
     enabled: true,
-    model_id: '',
+    model_id: availableModels.length > 0 ? availableModels[0].id : '',
     confidence_threshold: 0.4,
     use_gpu: true,
-    enable_tracking: true
+    enable_tracking: false
   });
   
-  // Carregar modelos disponíveis e configurações atuais
+  // Carregar configurações atuais
   useEffect(() => {
     const fetchData = async () => {
+      if (!cameraId) {
+        console.warn("AIModelSelector: cameraId não fornecido.");
+        setIsLoading(false);
+        return;
+      }
+      
       setIsLoading(true);
       setError(null);
       
       try {
-        // Buscar modelos disponíveis
-        const modelsResponse = await apiClient.get('/ai/models');
-        setModels(modelsResponse.data);
-        
-        // Buscar configurações atuais da câmera
-        const settingsResponse = await apiClient.get(`/cameras/${cameraId}/ai-settings`);
-        const settings = settingsResponse.data;
+        const settings = await cameraService.getCameraAISettings(cameraId);
         
         setCurrentSettings({
           enabled: settings.enabled !== false,
-          model_id: settings.model_id || '',
-          confidence_threshold: settings.confidence_threshold || 0.4,
+          model_id: settings.model_id || (availableModels.length > 0 ? availableModels[0].id : ''),
+          confidence_threshold: typeof settings.confidence_threshold === 'number' && settings.confidence_threshold >= 0.1 && settings.confidence_threshold <= 0.9 
+                                  ? settings.confidence_threshold 
+                                  : 0.4,
           use_gpu: settings.use_gpu !== false,
-          enable_tracking: settings.enable_tracking !== false
+          enable_tracking: settings.enable_tracking === true
         });
         
-        // Definir modelo selecionado
-        if (settings.model_id) {
-          setSelectedModel(settings.model_id);
-        } else if (modelsResponse.data && Array.isArray(modelsResponse.data) && modelsResponse.data.length > 0) {
-          // Selecionar o primeiro modelo como padrão
-          setSelectedModel(modelsResponse.data[0].id);
-        }
+        setSelectedModel(settings.model_id || (availableModels.length > 0 ? availableModels[0].id : ''));
+        
       } catch (err) {
-        console.error('Erro ao carregar dados:', err);
-        setError('Não foi possível carregar os modelos ou configurações. Tente novamente.');
+        console.error('Erro ao carregar dados de IA:', err);
+        setError('Não foi possível carregar as configurações de IA. Usando padrões.');
       } finally {
         setIsLoading(false);
       }
@@ -75,29 +83,47 @@ const AIModelSelector = ({ cameraId, onSave }) => {
   const handleInputChange = (e) => {
     const { name, value, type, checked } = e.target;
     
+    let processedValue;
+    if (type === 'checkbox') {
+      processedValue = checked;
+    } else if (name === 'confidence_threshold') { 
+      // Tratar especificamente o range slider, converter para float
+      processedValue = parseFloat(value);
+    } else {
+      processedValue = value;
+    }
+
     setCurrentSettings(prev => ({
       ...prev,
-      [name]: type === 'checkbox' ? checked : 
-              type === 'number' ? parseFloat(value) : 
-              value
+      [name]: processedValue
     }));
   };
   
   // Salvar configurações
   const handleSave = async () => {
+    if (!cameraId) {
+        toast.error("ID da câmera não encontrado para salvar configurações.");
+        return;
+    }
     setIsLoading(true);
+    setError(null);
     
     try {
-      await apiClient.put(`/cameras/${cameraId}/ai-settings`, currentSettings);
-      toast.success('Configurações de IA salvas com sucesso');
+      // Log antes de enviar
+      console.log("[AIModelSelector] Enviando currentSettings:", JSON.stringify(currentSettings)); 
+      console.log("[AIModelSelector] Tipo de confidence_threshold antes de enviar:", typeof currentSettings.confidence_threshold);
+
+      await cameraService.updateCameraAISettings(cameraId, currentSettings);
+      toast.success('Configurações de IA salvas com sucesso (simulado no backend)');
       
       if (onSave) {
         onSave(currentSettings);
       }
     } catch (err) {
-      console.error('Erro ao salvar configurações:', err);
-      setError('Não foi possível salvar as configurações. Tente novamente.');
-      toast.error('Erro ao salvar configurações de IA');
+      console.error('Erro ao salvar configurações de IA:', err);
+      const detail = err.response?.data?.detail;
+      setError(`Não foi possível salvar as configurações: ${detail || 'Erro desconhecido'}`);
+      toast.error(`Erro ao salvar configurações de IA: ${detail || 'Erro desconhecido'}`);
     } finally {
       setIsLoading(false);
     }
@@ -196,7 +222,9 @@ const AIModelSelector = ({ cameraId, onSave }) => {
             <div className="space-y-4">
               <div>
                 <label htmlFor="confidence-threshold" className="block text-sm font-medium text-gray-700">
-                  Limiar de Confiança: {currentSettings.confidence_threshold.toFixed(2)}
+                  Limiar de Confiança: {typeof currentSettings.confidence_threshold === 'number' 
+                                        ? currentSettings.confidence_threshold.toFixed(2) 
+                                        : 'N/A'}
                 </label>
                 <input
                   type="range"
@@ -205,7 +233,7 @@ const AIModelSelector = ({ cameraId, onSave }) => {
                   min="0.1"
                   max="0.9"
                   step="0.05"
-                  value={currentSettings.confidence_threshold}
+                  value={typeof currentSettings.confidence_threshold === 'number' ? currentSettings.confidence_threshold : 0.4}
                   onChange={handleInputChange}
                   className="mt-1 w-full"
                 />
@@ -220,7 +248,7 @@ const AIModelSelector = ({ cameraId, onSave }) => {
                   type="checkbox"
                   id="use-gpu"
                   name="use_gpu"
-                  checked={currentSettings.use_gpu}
+                  checked={!!currentSettings.use_gpu}
                   onChange={handleInputChange}
                   className="h-4 w-4 text-blue-600 focus:ring-blue-500"
                 />
@@ -234,7 +262,7 @@ const AIModelSelector = ({ cameraId, onSave }) => {
                   type="checkbox"
                   id="enable-tracking"
                   name="enable_tracking"
-                  checked={currentSettings.enable_tracking}
+                  checked={!!currentSettings.enable_tracking}
                   onChange={handleInputChange}
                   className="h-4 w-4 text-blue-600 focus:ring-blue-500"
                 />

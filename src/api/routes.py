@@ -9,8 +9,10 @@ from typing import List, Optional
 from datetime import datetime, timedelta
 from pydantic import BaseModel
 from ..db import cameras_crud, database
-from ..models.pyobjectid import PyObjectId
-from .auth import get_current_active_user, UserInDB
+# Removendo importação incorreta do MongoDB
+# from ..models.pyobjectid import PyObjectId
+from .auth import get_current_active_user
+from app.models.models import User as UserInDB
 # Importar funções de controle de câmera
 from ..detection.camera import (
     start_camera_process,
@@ -20,6 +22,10 @@ from ..detection.camera import (
 )
 from fastapi.responses import StreamingResponse
 import asyncio
+import logging
+
+# Configurar logger
+logger = logging.getLogger(__name__)
 
 # Configuração do router
 router = APIRouter(
@@ -29,9 +35,24 @@ router = APIRouter(
     responses={401: {"description": "Não autorizado"}, 403: {"description": "Não permitido"}},
 )
 
-# Removidos modelos antigos CameraInfo, CameraStart
-# Usaremos CameraDB e CameraCreate do cameras_crud
-from ..db.cameras_crud import CameraDB, CameraCreate
+# Definir modelos Pydantic para API
+class CameraBase(BaseModel):
+    name: str
+    url: str
+    location: Optional[str] = None
+    description: Optional[str] = None
+
+class CameraCreate(CameraBase):
+    pass
+
+class CameraDB(CameraBase):
+    id: int
+    owner: str
+    created_at: datetime
+    updated_at: Optional[datetime] = None
+    
+    class Config:
+        orm_mode = True
 
 # Novo modelo de resposta com status
 class CameraStatusInfo(CameraDB):

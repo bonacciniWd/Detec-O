@@ -1,6 +1,6 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
-import axios from 'axios';
 import { useNavigate } from 'react-router-dom';
+import api, { authService } from '../services/api';
 
 // Criação do contexto de autenticação
 const AuthContext = createContext();
@@ -16,145 +16,92 @@ export const AuthProvider = ({ children }) => {
   const [token, setToken] = useState(localStorage.getItem('token') || localStorage.getItem('accessToken') || null);
   const [user, setUser] = useState(null);
   const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState(null);
   const navigate = useNavigate();
-
-  // API base - usando variável central para fácil modificação
-  const API_BASE = '';  // Vazio para usar base relativa
 
   // Verificar o token e carregar os dados do usuário
   useEffect(() => {
     const checkAuth = async () => {
-      if (token) {
-        try {
-          // Configurar o token para todas as requisições
-          axios.defaults.headers.common['Authorization'] = `Bearer ${token}`;
-          
-          // Obter informações do usuário
-          try {
-            // Tentar ambos os endpoints para compatibilidade
-            let response;
-            try {
-              response = await axios.get(`${API_BASE}/auth/me`);
-            } catch (e) {
-              response = await axios.get(`${API_BASE}/v1/auth/me`);
-            }
-            
-            setUser(response.data);
+      setIsLoading(true);
+      
+      // Verificar se existe um token antes de tentar validá-lo
+      if (!token) {
+        console.log("Nenhum token encontrado, não tentando autenticação automática");
+        setIsAuthenticated(false);
+        setUser(null);
+        setIsLoading(false);
+        return;
+      }
+      
+      try {
+        // Adicionar token ao cabeçalho para esta requisição específica
+        const userData = await authService.getUser();
+        setUser(userData);
             setIsAuthenticated(true);
           } catch (error) {
-            console.error('Erro ao verificar autenticação:', error);
-            // Se o token for inválido, fazer logout
-            logout();
-          }
+        console.error("Erro ao verificar autenticação:", error);
+        // Limpar todos os tokens possíveis
+        localStorage.removeItem("token");
+        localStorage.removeItem("accessToken");
+        localStorage.removeItem("refreshToken");
+        localStorage.removeItem("authToken");
+        setUser(null);
+        setIsAuthenticated(false);
         } finally {
-          setIsLoading(false);
-        }
-      } else {
         setIsLoading(false);
       }
     };
 
     checkAuth();
-  }, [token]);
+  }, [token]); // Adicionar token como dependência
 
-  // Função de login mais robusta para lidar com diferentes formatos
+  // Função de login usando o serviço de API
   const login = async (email, password) => {
+    setIsLoading(true);
+    setError(null);
     try {
-      let response;
-      let responseData;
+      // 1. Fazer login e obter o token
+      const tokenData = await authService.login(email, password);
       
-      // Tentar ambos os endpoints
-      try {
-        // Tentar primeiro endpoint
-        try {
-          response = await axios.post(`${API_BASE}/auth/token`, { 
-            email, 
-            password,
-            username: email  // Para compatibilidade com OAuth2
-          });
-          responseData = response.data;
-        } catch (e) {
-          // Tentar com formato form-urlencoded
-          const formData = new URLSearchParams();
-          formData.append('username', email);
-          formData.append('password', password);
-          
-          response = await axios.post(`${API_BASE}/auth/token`, formData.toString(), {
-            headers: {
-              'Content-Type': 'application/x-www-form-urlencoded',
-            },
-          });
-          responseData = response.data;
-        }
-      } catch (firstEndpointError) {
-        console.log('Primeiro endpoint falhou, tentando alternativa', firstEndpointError);
-        
-        // Tentar segundo endpoint
-        response = await axios.post(`${API_BASE}/v1/auth/login`, { 
-          email, 
-          password 
-        });
-        responseData = response.data;
+      // 2. Verificar se o token foi recebido
+      if (!tokenData || !tokenData.access_token) {
+        throw new Error("Token de acesso não recebido após login.");
       }
       
-      console.log('Resposta do login:', responseData);
+      // 3. Atualizar o estado do token no contexto
+      // (localStorage já foi atualizado em authService.login)
+      setToken(tokenData.access_token);
       
-      // Extrair tokens independentemente do formato usado
-      const accessToken = responseData.access_token || responseData.authToken || responseData.token;
-      const refreshToken = responseData.refresh_token || responseData.refreshToken;
+      // 4. Buscar dados do usuário com o novo token
+      // authService.getUser() usará o token do localStorage atualizado
+      const userData = await authService.getUser();
       
-      if (!accessToken) {
-        throw new Error('Token não encontrado na resposta');
-      }
-      
-      // Salvar tokens em multiple locations para compatibilidade
-      localStorage.setItem('token', accessToken);
-      localStorage.setItem('accessToken', accessToken);
-      if (refreshToken) {
-        localStorage.setItem('refreshToken', refreshToken);
-      }
-      
-      // Atualizar o state
-      setToken(accessToken);
+      // 5. Atualizar o estado do usuário e autenticação
+      setUser(userData);
       setIsAuthenticated(true);
       
-      // Configurar o token para todas as requisições
-      axios.defaults.headers.common['Authorization'] = `Bearer ${accessToken}`;
+      return userData; // Retorna os dados do usuário
       
-      // Obter informações do usuário se não presentes na resposta
-      if (responseData.user) {
-        setUser(responseData.user);
-      } else {
-        try {
-          // Tentar ambos os endpoints para compatibilidade
-          let userResponse;
-          try {
-            userResponse = await axios.get(`${API_BASE}/auth/me`);
-          } catch (e) {
-            userResponse = await axios.get(`${API_BASE}/v1/auth/me`);
-          }
-          setUser(userResponse.data);
-        } catch (userError) {
-          console.error('Erro ao buscar usuário:', userError);
-          // Fallback: criar usuário básico
-          setUser({ id: '1', email, name: email.split('@')[0] });
-        }
-      }
-      
-      // Redirecionar para o dashboard
-      navigate('/dashboard');
-      
-      return { success: true };
     } catch (error) {
-      console.error('Erro ao fazer login:', error);
-      return { 
-        success: false, 
-        message: error.response?.data?.detail || error.message || 'Erro ao fazer login. Verifique suas credenciais.'
-      };
+      console.error("Erro no processo de login (AuthContext):", error);
+      
+      // Limpar tudo em caso de erro no processo
+      authService.logout(); // Limpa localStorage
+      setToken(null);
+      setUser(null);
+      setIsAuthenticated(false);
+      
+      const errorMessage = error?.response?.data?.detail || 
+                           error?.message || 
+                           "Erro desconhecido no login";
+      setError(typeof errorMessage === 'object' ? JSON.stringify(errorMessage) : errorMessage);
+      throw error;
+    } finally {
+       setIsLoading(false); // Garantir que isLoading seja falso
     }
   };
 
-  // Função de registro mais robusta
+  // Função de registro usando o serviço de API
   const register = async (userData) => {
     if (typeof userData === 'string') {
       // Se for string, assumir que é nome e usar outros argumentos
@@ -164,14 +111,7 @@ export const AuthProvider = ({ children }) => {
     }
     
     try {
-      let response;
-      
-      // Tentar ambos os endpoints
-      try {
-        response = await axios.post(`${API_BASE}/auth/register`, userData);
-      } catch (e) {
-        response = await axios.post(`${API_BASE}/v1/auth/register`, userData);
-      }
+      await authService.register(userData);
       
       // Após registro, tenta login automaticamente
       return await login(userData.email, userData.password);
@@ -186,18 +126,12 @@ export const AuthProvider = ({ children }) => {
 
   // Função de logout
   const logout = () => {
-    // Remover tokens do localStorage para garantir limpeza completa
-    localStorage.removeItem('token');
-    localStorage.removeItem('accessToken');
-    localStorage.removeItem('refreshToken');
+    authService.logout();
     
     // Limpar o state
     setToken(null);
     setUser(null);
     setIsAuthenticated(false);
-    
-    // Remover token das requisições
-    delete axios.defaults.headers.common['Authorization'];
     
     // Redirecionar para login
     navigate('/login');
@@ -209,6 +143,7 @@ export const AuthProvider = ({ children }) => {
     isLoading,
     token,
     user,
+    error,
     login,
     register,
     logout

@@ -10,7 +10,7 @@ from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import sessionmaker, Session
 from sqlalchemy.pool import QueuePool
 from datetime import datetime
-from contextlib import asynccontextmanager
+from contextlib import asynccontextmanager, contextmanager
 
 # Configurar logger
 logger = logging.getLogger(__name__)
@@ -20,66 +20,49 @@ engine = None
 SessionLocal = None
 Base = declarative_base()
 
-async def init_db(config: Dict[str, Any]) -> bool:
+# Função para obter sessão de forma síncrona (compatibilidade)
+def get_db():
+    """
+    Retorna um gerador para sessão de banco de dados SQLAlchemy.
+    
+    Yields:
+        Session: Uma sessão de banco de dados SQLAlchemy
+    """
+    global SessionLocal
+    
+    if not SessionLocal:
+        # Fallback para inicialização rápida do banco de dados se não estiver inicializado
+        from app.database import SessionLocal as AppSessionLocal
+        SessionLocal = AppSessionLocal
+    
+    db = SessionLocal()
+    try:
+        yield db
+    finally:
+        db.close()
+
+# Funções de compatibilidade com versão anterior
+async def init_db(config: Dict[str, Any] = None) -> bool:
     """
     Inicializa a conexão com o banco de dados.
+    Função mantida para compatibilidade.
 
     Args:
-        config: Configurações da aplicação
+        config: Configurações da aplicação (opcional)
 
     Returns:
         bool: True se a conexão foi estabelecida, False caso contrário
     """
-    global engine, SessionLocal
-
-    try:
-        # Obter configurações
-        db_url = config.get('database_url', os.environ.get('DATABASE_URL', 'postgresql://postgres:postgres@localhost:5432/deteco'))
-        db_name = db_url.split('/')[-1]
-
-        # Registrar início da conexão (sem expor senha)
-        safe_url = db_url.replace(db_url.split('@')[-2].split(':')[-1], '****')
-        logger.info(f"Conectando ao PostgreSQL: {safe_url}")
-
-        # Criar engine SQLAlchemy
-        engine = create_engine(
-            db_url,
-            poolclass=QueuePool,
-            pool_size=5,
-            max_overflow=10,
-            pool_timeout=30,
-            pool_recycle=1800,  # Reciclar conexões após 30 minutos
-            connect_args={"check_same_thread": False} if db_url.startswith("sqlite") else {}
-        )
-        
-        # Criar fábrica de sessão
-        SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
-        
-        # Verificar conexão
-        with SessionLocal() as session:
-            # Executa uma query simples para verificar conexão
-            session.execute("SELECT 1")
-        
-        logger.info(f"Conexão estabelecida com o banco de dados: {db_name}")
-        
-        # Criar tabelas se não existirem
-        await _ensure_tables()
-        
-        return True
-    except Exception as e:
-        logger.error(f"Erro ao conectar ao PostgreSQL: {str(e)}")
-        return False
+    logger.info("Chamada de init_db para compatibilidade - usando app.database agora")
+    return True
 
 async def close_db() -> None:
     """
     Fecha a conexão com o banco de dados.
+    Função mantida para compatibilidade.
     """
-    global engine
-
-    if engine:
-        logger.info("Fechando conexão com o PostgreSQL")
-        engine.dispose()
-        engine = None
+    logger.info("Chamada de close_db para compatibilidade - sem operação necessária")
+    return
 
 async def _ensure_tables() -> None:
     """

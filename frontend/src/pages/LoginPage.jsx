@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useAuth } from '../contexts/AuthContext'; // Importar useAuth
-import { Link } from 'react-router-dom'; // Para link para Registro
+import { Link, useNavigate } from 'react-router-dom'; // Adicionar useNavigate
 
 function LoginPage() {
   const [email, setEmail] = useState('');
@@ -9,6 +9,7 @@ function LoginPage() {
   // Usar o estado de loading do AuthContext
   const { login, isLoading } = useAuth(); 
   const canvasRef = useRef(null);
+  const navigate = useNavigate(); // Instanciar useNavigate
 
   // Efeito para configurar o canvas de fundo
   useEffect(() => {
@@ -109,12 +110,32 @@ function LoginPage() {
     event.preventDefault();
     setError(null); 
     try {
-      await login(email, password); 
-      // Navegação é feita dentro da função login no AuthContext
+      console.log(`Tentando login com email: ${email}`);
+      // Chama a função login do AuthContext. Se falhar, vai direto pro catch.
+      const userData = await login(email, password);
+      
+      // Se chegou aqui, o login foi bem-sucedido!
+      console.log("Login bem-sucedido, navegando para /dashboard", userData);
+      navigate('/dashboard'); // Redirecionar para a página principal
+
     } catch (err) {
-      // A função login lança um erro com a mensagem apropriada
-      setError(err.message); 
-      console.error('Erro no login:', err);
+      console.error('Erro ao processar login:', err);
+      // Montar mensagem de erro amigável
+      let errorMessage = 'Ocorreu um erro ao fazer login.';
+      
+      if (err.response) {
+        if (err.response.status === 401) {
+          errorMessage = 'Credenciais inválidas. Verifique seu email e senha.';
+        } else if (err.response.status === 500) {
+          errorMessage = 'Erro no servidor. Tente novamente mais tarde.';
+        } else if (err.response.data && typeof err.response.data.detail === 'string') {
+          errorMessage = err.response.data.detail;
+        }
+      } else if (typeof err.message === 'string') {
+        errorMessage = err.message;
+      }
+      
+      setError(errorMessage);
     }
   };
 

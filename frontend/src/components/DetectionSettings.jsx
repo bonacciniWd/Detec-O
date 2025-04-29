@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { toast } from 'react-toastify';
-import apiClient from '../services/api';
+import cameraService from '../services/cameraService';
+import PropTypes from 'prop-types';
 
 const DetectionSettings = ({ cameraId, onSave }) => {
   const [isLoading, setIsLoading] = useState(true);
@@ -24,15 +25,26 @@ const DetectionSettings = ({ cameraId, onSave }) => {
   // Carregar configurações existentes
   useEffect(() => {
     const fetchSettings = async () => {
+      if (!cameraId) {
+          console.warn("DetectionSettings: cameraId não fornecido.");
+          setIsLoading(false);
+          return;
+      }
       try {
         setIsLoading(true);
-        const response = await apiClient.get(`/v1/detection/settings/${cameraId}`);
-        if (response.data && response.data.settings) {
-          setSettings(response.data.settings);
-        }
+        const settingsData = await cameraService.getCameraDetectionSettings(cameraId);
+        setSettings(settingsData); 
       } catch (error) {
         console.error('Erro ao carregar configurações de detecção:', error);
         toast.error('Erro ao carregar configurações de detecção');
+        setSettings({
+          enabled: false,
+          confidence_threshold: 0.5,
+          iou_threshold: 0.45,
+          detect_objects: true,
+          detection_interval: 5,
+          object_classes: ["person", "car", "bicycle"],
+        });
       } finally {
         setIsLoading(false);
       }
@@ -85,17 +97,22 @@ const DetectionSettings = ({ cameraId, onSave }) => {
 
   // Salvar configurações
   const saveSettings = async () => {
+    if (!cameraId) {
+        toast.error("ID da câmera não encontrado para salvar configurações.");
+        return;
+    }
     try {
       setIsLoading(true);
-      await apiClient.post(`/v1/detection/configure/${cameraId}`, settings);
-      toast.success('Configurações salvas com sucesso');
+      await cameraService.updateCameraDetectionSettings(cameraId, settings);
+      toast.success('Configurações salvas com sucesso (simulado no backend)');
       
       if (onSave) {
         onSave(settings);
       }
     } catch (error) {
       console.error('Erro ao salvar configurações:', error);
-      toast.error('Erro ao salvar configurações');
+      const detail = error.response?.data?.detail;
+      toast.error(`Erro ao salvar configurações: ${detail || 'Erro desconhecido'}`);
     } finally {
       setIsLoading(false);
     }
@@ -132,13 +149,11 @@ const DetectionSettings = ({ cameraId, onSave }) => {
       const formData = new FormData();
       formData.append('file', testImage);
       
-      const response = await apiClient.post(
-        `/v1/detection/analyze?confidence=${settings.confidence_threshold}&camera_id=${cameraId}`, 
+      const response = await cameraService.analyzeImage(
         formData,
         {
-          headers: {
-            'Content-Type': 'multipart/form-data'
-          }
+          confidence: settings.confidence_threshold,
+          camera_id: cameraId
         }
       );
       
@@ -170,6 +185,34 @@ const DetectionSettings = ({ cameraId, onSave }) => {
     { id: "falling_person", label: "Pessoa Caindo" }
   ];
 
+  // Helper para renderizar checkboxes de classes
+  const renderClassCheckboxes = (availableClasses, selectedClasses, type, toggleFunction) => {
+    if (!Array.isArray(selectedClasses)) {
+      return <p className="text-xs text-red-400 col-span-2">Erro: Dados de classes de {type} inválidos.</p>;
+    }
+    if (selectedClasses.length === 0) {
+      // Pode retornar vazio ou uma mensagem indicando que nenhuma está selecionada, dependendo da preferência.
+      // return <p className="text-xs text-gray-400 col-span-2">Nenhuma classe de {type} selecionada.</p>;
+    }
+    return availableClasses.map(item => (
+      <div key={item.id} className="flex items-center">
+        <input
+          type="checkbox"
+          id={`${type}-${item.id}`}
+          checked={selectedClasses.includes(item.id)}
+          onChange={() => toggleFunction(item.id)}
+          className="w-4 h-4 text-blue-600 bg-gray-700 border-gray-600 rounded focus:ring-blue-600"
+        />
+        <label
+          htmlFor={`${type}-${item.id}`}
+          className="ml-2 text-sm text-gray-300"
+        >
+          {item.label}
+        </label>
+      </div>
+    ));
+  };
+
   return (
     <div className="bg-gray-800 rounded-lg p-4 mt-4">
       {isLoading ? (
@@ -200,13 +243,13 @@ const DetectionSettings = ({ cameraId, onSave }) => {
                 {settings.enabled ? 'Ativada' : 'Desativada'}
               </span>
             </div>
-      </div>
-      
+          </div>
+          
           {/* Threshold de confiança */}
           <div className="mb-4">
             <label className="block text-gray-300 mb-2">
               Limiar de Confiança: {settings.confidence_threshold.toFixed(2)}
-          </label>
+            </label>
             <input
               type="range"
               min="0.1"
@@ -220,14 +263,14 @@ const DetectionSettings = ({ cameraId, onSave }) => {
               <span>0.1</span>
               <span>0.5</span>
               <span>1.0</span>
+            </div>
           </div>
-        </div>
-        
+          
           {/* Intervalo de detecção */}
           <div className="mb-4">
             <label className="block text-gray-300 mb-2">
               Intervalo de Detecção: {settings.detection_interval} frames
-          </label>
+            </label>
             <input
               type="range"
               min="1"
@@ -241,60 +284,30 @@ const DetectionSettings = ({ cameraId, onSave }) => {
               <span>1</span>
               <span>15</span>
               <span>30</span>
+            </div>
           </div>
-        </div>
-        
+          
           {/* Classes de objetos */}
           <div className="mb-4">
             <label className="block text-gray-300 mb-2">
               Objetos a Detectar
-          </label>
+            </label>
             <div className="grid grid-cols-2 gap-2">
-              {availableObjectClasses.map(objectClass => (
-                <div key={objectClass.id} className="flex items-center">
-          <input
-                    type="checkbox"
-                    id={`object-${objectClass.id}`}
-                    checked={settings.object_classes.includes(objectClass.id)}
-                    onChange={() => toggleObjectClass(objectClass.id)}
-                    className="w-4 h-4 text-blue-600 bg-gray-700 border-gray-600 rounded focus:ring-blue-600"
-                  />
-                  <label
-                    htmlFor={`object-${objectClass.id}`}
-                    className="ml-2 text-sm text-gray-300"
-                  >
-                    {objectClass.label}
-                  </label>
-                </div>
-              ))}
+              {renderClassCheckboxes(availableObjectClasses, settings.object_classes, 'object', toggleObjectClass)}
             </div>
-        </div>
+          </div>
         
-          {/* Classes de comportamento */}
+          {/* --- Classes de comportamento (Temporariamente Oculto) --- */}
+          {/* 
           <div className="mb-4">
             <label className="block text-gray-300 mb-2">
               Comportamentos a Detectar
             </label>
             <div className="grid grid-cols-2 gap-2">
-              {availableBehaviorClasses.map(behaviorClass => (
-                <div key={behaviorClass.id} className="flex items-center">
-                <input
-                  type="checkbox"
-                    id={`behavior-${behaviorClass.id}`}
-                    checked={settings.behavior_classes.includes(behaviorClass.id)}
-                    onChange={() => toggleBehaviorClass(behaviorClass.id)}
-                    className="w-4 h-4 text-blue-600 bg-gray-700 border-gray-600 rounded focus:ring-blue-600"
-                  />
-                  <label
-                    htmlFor={`behavior-${behaviorClass.id}`}
-                    className="ml-2 text-sm text-gray-300"
-                  >
-                    {behaviorClass.label}
-                </label>
-              </div>
-            ))}
+              {renderClassCheckboxes(availableBehaviorClasses, settings.behavior_classes, 'behavior', toggleBehaviorClass)}
+            </div>
           </div>
-        </div>
+          */}
         
           {/* Ações */}
           <div className="mb-4">
@@ -302,10 +315,10 @@ const DetectionSettings = ({ cameraId, onSave }) => {
               Ações
             </label>
             <div className="flex items-center mb-2">
-            <input
-              type="checkbox"
+              <input
+                type="checkbox"
                 id="alert-on-detection"
-                checked={settings.alert_on_detection}
+                checked={!!settings.alert_on_detection}
                 onChange={(e) => handleSettingChange('alert_on_detection', e.target.checked)}
                 className="w-4 h-4 text-blue-600 bg-gray-700 border-gray-600 rounded focus:ring-blue-600"
               />
@@ -314,20 +327,20 @@ const DetectionSettings = ({ cameraId, onSave }) => {
                 className="ml-2 text-sm text-gray-300"
               >
                 Alertar quando objetos perigosos forem detectados
-            </label>
+              </label>
+            </div>
           </div>
-        </div>
         
           {/* Botão de salvar */}
           <div className="mt-6">
-          <button
+            <button
               onClick={saveSettings}
               disabled={isLoading}
               className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-md"
             >
               {isLoading ? 'Salvando...' : 'Salvar Configurações'}
-          </button>
-        </div>
+            </button>
+          </div>
         
           {/* Testes de Detecção */}
           <div className="mt-8 border-t border-gray-700 pt-4">
@@ -337,7 +350,7 @@ const DetectionSettings = ({ cameraId, onSave }) => {
               <label className="block text-gray-300 mb-2">
                 Upload de Imagem para Teste
               </label>
-                <input
+              <input
                 type="file"
                 accept="image/*"
                 onChange={handleImageChange}
@@ -379,7 +392,7 @@ const DetectionSettings = ({ cameraId, onSave }) => {
                   <p className="text-gray-300">
                     <span className="font-medium">Tempo de Inferência:</span> {(detectionResult.statistics.inference_time * 1000).toFixed(1)}ms
                   </p>
-            </div>
+                </div>
                 
                 {detectionResult.image_result && (
                   <div>
@@ -389,9 +402,9 @@ const DetectionSettings = ({ cameraId, onSave }) => {
                       alt="Detection Result" 
                       className="max-w-full rounded-md" 
                     />
-          </div>
-        )}
-        
+                  </div>
+                )}
+                
                 {detectionResult.detections.length > 0 && (
                   <div className="mt-4">
                     <p className="text-white font-medium mb-2">Detecções:</p>
@@ -409,16 +422,21 @@ const DetectionSettings = ({ cameraId, onSave }) => {
                           )}
                         </div>
                       ))}
-          </div>
-        </div>
+                    </div>
+                  </div>
                 )}
               </div>
             )}
-      </div>
+          </div>
         </>
       )}
     </div>
   );
+};
+
+DetectionSettings.propTypes = {
+  cameraId: PropTypes.string.isRequired,
+  onSave: PropTypes.func
 };
 
 export default DetectionSettings; 

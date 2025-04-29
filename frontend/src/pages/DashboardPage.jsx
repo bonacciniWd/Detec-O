@@ -49,13 +49,16 @@ function DashboardPage() {
         const [camerasResponse, eventsResponse] = await Promise.all([
           api.get('/v1/cameras'),
           api.get('/v1/events', { params: { limit: 50 } })
-        ]);
+        ]).catch(error => {
+          console.error("Erro nas requisições:", error);
+          return [{ data: [] }, { data: { events: [] } }]; // Valores padrão em caso de erro
+        });
 
-        // Processar dados das câmeras
-        const cameraList = camerasResponse.data;
+        // Processar dados das câmeras - garantir que é um array
+        const cameraList = Array.isArray(camerasResponse.data) ? camerasResponse.data : [];
         
-        // Processar dados dos eventos
-        const eventsList = eventsResponse.data.events || [];
+        // Processar dados dos eventos - garantir que é um array
+        const eventsList = Array.isArray(eventsResponse.data?.events) ? eventsResponse.data.events : [];
         
         // Calcular estatísticas básicas
         const activeCameras = cameraList.filter(cam => cam.running || cam.detection_enabled).length;
@@ -110,14 +113,27 @@ function DashboardPage() {
           activeCameras,
           totalEvents: eventsList.length,
           eventsByType,
-          recentEvents: eventsList.slice(0, 5),
+          recentEvents: eventsList.slice(0, 5) || [],
           eventsByZone,
           eventsBySeverity: severityChartData,
           eventsTimeSeries,
           detectionAccuracy: Math.round(detectionAccuracy)
         });
       } catch (err) {
-        console.error('Erro ao buscar dados do dashboard:', err);
+        console.error('\nErro ao buscar dados do dashboard:', err);
+        // Definir valores padrão em caso de erro
+        setStatistics(prevStats => ({
+          ...prevStats,
+          totalCameras: 0,
+          activeCameras: 0,
+          totalEvents: 0,
+          eventsByType: {},
+          recentEvents: [],
+          eventsByZone: [],
+          eventsBySeverity: [],
+          eventsTimeSeries: [],
+          detectionAccuracy: 0
+        }));
         setEventsError('Não foi possível carregar os dados. Por favor, recarregue a página.');
       } finally {
         setIsLoading(false);
@@ -138,11 +154,19 @@ function DashboardPage() {
     setIsLoadingEvents(true);
     try {
       // Buscando os últimos 5 eventos
-      const events = await eventService.getEvents({ limit: 5 });
-      setStatistics(prev => ({ ...prev, recentEvents: events }));
+      const events = await eventService.getEvents({ limit: 5 }).catch(error => {
+        console.error("Erro ao buscar eventos:", error);
+        return []; // Retornar array vazio em caso de erro
+      });
+      
+      // Garantir que sempre temos um array, mesmo se a API retornar outro tipo de dados
+      const safeEvents = Array.isArray(events) ? events : [];
+      
+      setStatistics(prev => ({ ...prev, recentEvents: safeEvents }));
     } catch (error) {
       console.error("Erro ao buscar eventos recentes:", error);
       setEventsError("Não foi possível carregar os eventos recentes.");
+      setStatistics(prev => ({ ...prev, recentEvents: [] }));
     } finally {
       setIsLoadingEvents(false);
     }
@@ -402,17 +426,17 @@ function DashboardPage() {
                   <h3 className="text-lg leading-6 font-medium text-gray-800 dark:text-white">Eventos Recentes</h3>
                   <p className="mt-1 max-w-2xl text-sm text-gray-500 dark:text-gray-400">Últimas detecções do sistema.</p>
                 </div>
-                {statistics.recentEvents.length > 0 ? (
+                {Array.isArray(statistics.recentEvents) && statistics.recentEvents.length > 0 ? (
                   <div className="divide-y divide-gray-200 dark:divide-gray-700">
                     {statistics.recentEvents.map((event) => (
-                      <div key={event.id} className="px-4 py-4 sm:px-6 hover:bg-gray-50 dark:hover:bg-gray-700">
+                      <div key={event.id || Math.random()} className="px-4 py-4 sm:px-6 hover:bg-gray-50 dark:hover:bg-gray-700">
                         <div className="flex items-center justify-between">
                           <div className="flex items-center">
                             <div className={`flex-shrink-0 h-3 w-3 rounded-full ${
                               event.severity === 'red' ? 'bg-red-500' : 
                               event.severity === 'yellow' ? 'bg-yellow-500' : 'bg-blue-500'
                             }`}></div>
-                            <p className="ml-2 text-sm font-medium text-gray-800 dark:text-white truncate">{event.event_type}</p>
+                            <p className="ml-2 text-sm font-medium text-gray-800 dark:text-white truncate">{event.event_type || 'Evento'}</p>
                           </div>
                           <div className="ml-2 flex-shrink-0 flex">
                             <p className="px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-gray-100 dark:bg-gray-700 text-gray-800 dark:text-gray-300">
@@ -433,7 +457,7 @@ function DashboardPage() {
                           </div>
                           <div className="mt-2 flex items-center text-sm text-gray-500 dark:text-gray-400 sm:mt-0">
                             <span className="mr-1">Confiança:</span>
-                            <span>{Math.round(event.confidence * 100)}%</span>
+                            <span>{Math.round((event.confidence || 0) * 100)}%</span>
                           </div>
                         </div>
                       </div>

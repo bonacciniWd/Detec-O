@@ -68,13 +68,13 @@ function App() {
   useEffect(() => {
     // Iniciar notificações apenas quando autenticado e não mais carregando
     if (isAuthenticated && !isLoading) {
-      notificationService.startListening();
-      console.log('Iniciando serviço de notificações');
+      // notificationService.init() é chamado automaticamente
+      console.log('Serviço de notificações já iniciado automaticamente');
     }
     
     // Limpar ao desmontar
     return () => {
-      notificationService.stopListening();
+      notificationService.dispose();
       console.log('Parando serviço de notificações');
     };
   }, [isAuthenticated, isLoading]);

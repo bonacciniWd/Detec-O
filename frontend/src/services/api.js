@@ -1,203 +1,214 @@
 import axios from 'axios';
 
-// Criar instância do axios com configuração base
+// Criar instância do axios com configuração básica
 const api = axios.create({
-  baseURL: '/api', // Base URL para todas as requisições
-  timeout: 10000, // Timeout de 10 segundos
+  baseURL: '',  // Será gerenciado pelo proxy do Vite
+  timeout: 15000, // Aumentar o timeout para debug
   headers: {
     'Content-Type': 'application/json'
   }
 });
 
-// Interceptor para adicionar token em todas as requisições
+// Interceptador para requisições
 api.interceptors.request.use(
-  (config) => {
-    const token = localStorage.getItem('accessToken');
-    if (token) {
-      config.headers.Authorization = `Bearer ${token}`;
+  config => {
+    // Log da requisição para debug
+    // console.log(`Enviando requisição: ${config.method.toUpperCase()} ${config.url}`);
+    console.log(`[Interceptor Request] Método: ${config.method.toUpperCase()}, URL Original: ${config.url}`); // Log URL original
+    
+    // Não modificar headers para requisições de autenticação, definimos diretamente na chamada
+    const token = localStorage.getItem('token');
+    if (token && !config.url.includes('/auth/')) {
+      config.headers['Authorization'] = `Bearer ${token}`;
+      console.log(`[Interceptor Request] Token adicionado para URL: ${config.url}`); // Confirma adição
+    } else if (!token && !config.url.includes('/auth/')) {
+      console.warn(`[Interceptor Request] Token NÃO encontrado para URL: ${config.url}`); // Aviso se token faltar
+    } else {
+       console.log(`[Interceptor Request] URL de auth ou token já presente. Header não modificado para: ${config.url}`);
     }
     return config;
   },
-  (error) => {
+  error => {
+    // console.error('Erro na requisição:', error);
+    console.error('[Interceptor Request] Erro:', error);
     return Promise.reject(error);
   }
 );
 
-// Interceptor de resposta para tratamento global de erros
+// Interceptor para tratar erros de autenticação (não redireciona mais em caso de erro 401)
 api.interceptors.response.use(
   (response) => {
     return response;
   },
   (error) => {
-    if (error.response) {
-      // Tratamento específico para erros de autenticação
-      if (error.response.status === 401) {
-        localStorage.removeItem('accessToken');
-        localStorage.removeItem('refreshToken');
-        // Redirecionar para login se necessário
-        if (window.location.pathname !== '/login') {
-          window.location.href = '/login';
-        }
-      }
+    // Registra o erro para debug
+    console.error("API Error interceptado:", error.response?.status);
+    
+    // Se for erro 401 (Unauthorized), apenas registra no console
+    if (error.response && error.response.status === 401) {
+      console.log("Erro 401 detectado - sessão expirada ou token inválido");
+      // Não remove o token nem redireciona para permitir refresh rápido
     }
+    
     return Promise.reject(error);
   }
 );
 
-// Métodos específicos para API
-const apiClient = {
-  // Métodos HTTP genéricos
-  get: async (url, config) => {
-    return api.get(url, config);
-  },
-  
-  post: async (url, data, config) => {
-    return api.post(url, data, config);
-  },
-  
-  put: async (url, data, config) => {
-    return api.put(url, data, config);
-  },
-  
-  delete: async (url, config) => {
-    return api.delete(url, config);
-  },
-  
-  // Atributo para acessar a configuração defaults
-  defaults: api.defaults,
-  
-  // Método base para obter URL da API
-  getBaseUrl: () => {
-    return api.defaults.baseURL;
-  },
-  
-  // Métodos para gerenciamento de câmeras e dispositivos
-  
-  // Obter lista de todos os dispositivos
-  getDevices: async () => {
+// Serviço de autenticação simplificado e robusto
+export const authService = {
+  // Método de login usando form-urlencoded
+  login: async (email, password) => {
     try {
-      const response = await api.get('/v1/devices');
+      console.log(`Tentando login para: ${email}`);
+      
+      // Tentar login com a rota /login usando JSON (Rota mais específica para JSON)
+      const response = await api.post('/api/auth/login', {
+        username: email,
+        password: password
+      });
+      
+      console.log('Resposta de login:', response.data);
+      
+      // Armazenar token
+      if (response.data && response.data.access_token) {
+        localStorage.setItem('token', response.data.access_token);
+        localStorage.setItem('accessToken', response.data.access_token);
+      }
+      
       return response.data;
     } catch (error) {
-      console.error('Erro ao obter lista de dispositivos:', error);
+      console.error('Erro no login:', error);
+      
+      // Detalhar erro para debug
+      if (error.response) {
+        console.error('Detalhes do erro de login:', {
+          status: error.response.status,
+          data: error.response.data || 'Sem dados',
+          headers: error.response.headers
+        });
+      } else if (error.request) {
+        console.error('Erro na requisição - sem resposta:', error.request);
+      } else {
+        console.error('Erro ao configurar requisição:', error.message);
+      }
+      
+      // Apenas propagar o erro sem redirecionamento
       throw error;
     }
   },
   
-  // Obter detalhes de um dispositivo específico
-  getDevice: async (deviceId) => {
+  // Login alternativo com JSON
+  loginWithJson: async (email, password) => {
     try {
-      const response = await api.get(`/v1/devices/${deviceId}`);
+      console.log(`Tentando login com JSON para: ${email}`);
+      
+      const response = await api.post('/api/auth/login', {
+        username: email,
+        password: password
+      });
+      
+      // Armazenar token
+      if (response.data && response.data.access_token) {
+        localStorage.setItem('token', response.data.access_token);
+        localStorage.setItem('accessToken', response.data.access_token);
+      }
+      
       return response.data;
     } catch (error) {
-      console.error(`Erro ao obter detalhes do dispositivo ${deviceId}:`, error);
+      console.error('Erro no login com JSON:', error);
       throw error;
     }
   },
   
-  // Obter streams de um dispositivo
-  getDeviceStreams: async (deviceId) => {
+  // Método de login usando form-urlencoded (caso o JSON falhe)
+  loginWithForm: async (email, password) => {
     try {
-      const response = await api.get(`/v1/devices/${deviceId}/streams`);
+      console.log(`Tentando login com form-urlencoded para: ${email}`);
+      
+      // Criar form-urlencoded data
+      const formData = new URLSearchParams();
+      formData.append('username', email);
+      formData.append('password', password);
+      
+      // Usar URL direta do backend para evitar problemas
+      const backendUrl = 'http://localhost:8000';
+      const response = await axios.post(`${backendUrl}/api/auth/token`, formData, {
+        headers: {
+          'Content-Type': 'application/x-www-form-urlencoded'
+        }
+      });
+      
+      console.log('Resposta de login form:', response.data);
+      
+      // Armazenar token
+      if (response.data && response.data.access_token) {
+        localStorage.setItem('token', response.data.access_token);
+        localStorage.setItem('accessToken', response.data.access_token);
+      }
+      
       return response.data;
     } catch (error) {
-      console.error(`Erro ao obter streams do dispositivo ${deviceId}:`, error);
+      console.error('Erro no login com form:', error);
       throw error;
     }
   },
   
-  // Atualizar um dispositivo
-  updateDevice: async (deviceId, data) => {
+  // Obter dados do usuário atual
+  getUser: async () => {
     try {
-      const response = await api.put(`/v1/devices/${deviceId}`, data);
+      const token = localStorage.getItem('token') || localStorage.getItem('accessToken');
+      if (!token) {
+        throw new Error('Nenhum token encontrado');
+      }
+      
+      console.log('Obtendo dados do usuário com token:', token.substring(0, 15) + '...');
+      
+      const response = await api.get('/api/auth/me', {
+        headers: {
+          'Authorization': `Bearer ${token}`
+        }
+      });
+      
+      console.log('Dados do usuário obtidos:', response.data);
       return response.data;
     } catch (error) {
-      console.error(`Erro ao atualizar dispositivo ${deviceId}:`, error);
+      console.error('Erro ao obter dados do usuário:', error);
       throw error;
     }
   },
   
-  // Excluir um dispositivo
-  deleteDevice: async (deviceId) => {
-    try {
-      const response = await api.delete(`/v1/devices/${deviceId}`);
-      return response.data;
-    } catch (error) {
-      console.error(`Erro ao excluir dispositivo ${deviceId}:`, error);
-      throw error;
-    }
+  // Logout
+  logout: () => {
+    console.log('Realizando logout, removendo tokens');
+    localStorage.removeItem('token');
+    localStorage.removeItem('accessToken');
+    localStorage.removeItem('refreshToken');
   },
   
-  // Descobrir câmeras disponíveis na rede
-  discoverCameras: async (options = {}) => {
+  // Registro de novo usuário
+  register: async (userData) => {
     try {
-      const response = await api.post('/devices/discover', options);
+      console.log('Registrando novo usuário:', userData.email);
+      const response = await api.post('/api/auth/register', userData);
+      console.log('Usuário registrado com sucesso:', response.data);
       return response.data;
     } catch (error) {
-      console.error('Erro ao descobrir câmeras:', error);
-      throw error;
-    }
-  },
-  
-  // Conectar a uma câmera específica
-  connectCamera: async (cameraData) => {
-    try {
-      const response = await api.post('/devices/connect', cameraData);
-      return response.data;
-    } catch (error) {
-      console.error('Erro ao conectar à câmera:', error);
-      throw error;
-    }
-  },
-  
-  // Obter configurações de detecção para uma câmera
-  getDetectionSettings: async (cameraId) => {
-    try {
-      const response = await api.get(`/v1/cameras/${cameraId}/settings`);
-      return response.data;
-    } catch (error) {
-      console.error('Erro ao obter configurações de detecção:', error);
-      throw error;
-    }
-  },
-  
-  // Salvar configurações de detecção para uma câmera
-  saveDetectionSettings: async (cameraId, settings) => {
-    try {
-      const response = await api.put(`/v1/cameras/${cameraId}/settings`, settings);
-      return response.data;
-    } catch (error) {
-      console.error('Erro ao salvar configurações de detecção:', error);
-      throw error;
-    }
-  },
-  
-  // Obter preview de uma câmera
-  getCameraPreview: (cameraId) => {
-    return `${api.defaults.baseURL}/v1/cameras/${cameraId}/preview`;
-  },
-  
-  // Exportar as zonas de detecção
-  exportDetectionZones: async (cameraId) => {
-    try {
-      const response = await api.get(`/v1/cameras/${cameraId}/detection-zones/export`);
-      return response.data;
-    } catch (error) {
-      console.error('Erro ao exportar zonas de detecção:', error);
-      throw error;
-    }
-  },
-  
-  // Importar zonas de detecção
-  importDetectionZones: async (cameraId, zonesData) => {
-    try {
-      const response = await api.post(`/v1/cameras/${cameraId}/detection-zones/import`, zonesData);
-      return response.data;
-    } catch (error) {
-      console.error('Erro ao importar zonas de detecção:', error);
+      console.error('Erro ao registrar usuário:', error);
       throw error;
     }
   }
 };
 
-export default apiClient; 
+// Adicionar serviço de mock para endpoints não implementados
+// Adicionar esta função após o serviço de autenticação
+
+/* Mocks removidos - usando apenas a API real */
+
+// Interceptador de requisição para endpoints que ainda não existem
+const originalRequest = api.request;
+api.request = function (config) {
+  // Enviar todas as requisições para a API real
+  return originalRequest.apply(this, arguments);
+};
+
+export default api; 

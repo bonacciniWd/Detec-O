@@ -1,12 +1,15 @@
-import React from 'react';
-import { Link, useNavigate } from 'react-router-dom';
+import React, { useRef, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
+import { TypeAnimation } from 'react-type-animation';
 import Lottie from 'lottie-react';
 import cameraAnimation from '../assets/lottie/splash-animation.json';
+
 
 function LandingPage() {
   const { isAuthenticated } = useAuth();
   const navigate = useNavigate();
+  const videoRef = useRef(null);
 
   const handleAccessClick = () => {
     if (isAuthenticated) {
@@ -15,6 +18,36 @@ function LandingPage() {
       navigate('/login');
     }
   };
+
+  useEffect(() => {
+    const videoElement = videoRef.current;
+    if (!videoElement) return;
+
+    videoElement.play().catch(error => {
+      console.log("Autoplay bloqueado, esperando interação do usuário.");
+    });
+
+    const handleInteraction = () => {
+      videoElement.play().then(() => {
+        console.log("Vídeo iniciado após interação.");
+        window.removeEventListener('scroll', handleInteraction, { once: true });
+        window.removeEventListener('touchstart', handleInteraction, { once: true });
+        window.removeEventListener('click', handleInteraction, { once: true });
+      }).catch(error => {
+        console.error("Erro ao tentar tocar vídeo após interação:", error);
+      });
+    };
+
+    window.addEventListener('scroll', handleInteraction, { once: true, passive: true });
+    window.addEventListener('touchstart', handleInteraction, { once: true, passive: true });
+    window.addEventListener('click', handleInteraction, { once: true });
+
+    return () => {
+      window.removeEventListener('scroll', handleInteraction);
+      window.removeEventListener('touchstart', handleInteraction);
+      window.removeEventListener('click', handleInteraction);
+    };
+  }, []);
 
   return (
     <div className="bg-gray-100">
@@ -80,6 +113,45 @@ function LandingPage() {
               Solicitar Demonstração
             </a>
           </div>
+        </div>
+      </div>
+
+      <div id="video-intro" className="py-16 bg-gray-50 text-center">
+        <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8">
+           <div className="h-16 sm:h-20 mb-12">
+            <TypeAnimation
+              sequence={[
+                'Veja o Detec-o em Ação',
+                1500,
+                'Monitoramento Inteligente para sua Segurança',
+                1500,
+                'Detecção Automática de Ameaças',
+                1500,
+                'Proteção Contínua com IA Avançada',
+                1500
+              ]}
+              wrapper="h2"
+              speed={50}
+              className="text-3xl leading-8 font-extrabold tracking-tight text-gray-900 sm:text-4xl"
+              repeat={Infinity}
+              cursor={true}
+            />
+          </div>
+            <div className="aspect-video rounded-lg shadow-xl overflow-hidden border border-gray-300">
+              <video 
+                ref={videoRef}
+                src="/videos/monitoring.mp4" 
+                loop 
+                muted 
+                autoPlay 
+                playsInline
+                controls={false}
+                className="w-full h-full object-cover"
+              />
+            </div>
+            <p className="mt-8 text-lg text-gray-600">
+              Monitoramento contínuo e inteligente para sua tranquilidade.
+            </p>
         </div>
       </div>
 
@@ -257,6 +329,129 @@ function LandingPage() {
             </div>
           </div>
         </div>
+      </div>
+
+      {/* Nova Seção - Indústrias e Casos de Uso */}
+      <div id="industrias" className="py-0 bg-gray-100 overflow-hidden">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+          <div className="grid grid-cols-2 md:grid-cols-3 gap-4 items-center">
+            
+            {/* Coluna 1 de Imagens (Rolagem para cima) */}
+            <div className="h-[400px] md:h-[600px] overflow-hidden relative order-2 md:order-1 md:col-span-1">
+              <div className="animate-marquee-vertical space-y-4 absolute top-0 left-0 w-full">
+                {[
+                  { href: "#", src: "https://cdn.prod.website-files.com/612770618d97595db63a9470/63e3ab8c049dc18492e274d8_Rectangle%204543.jpg", alt: "plant leaf disease classification and damage detection", title: "Agricultura" },
+                  { href: "#", src: "https://cdn.prod.website-files.com/612770618d97595db63a9470/63e3ab8c43813b24ada15e1b_Rectangle%204544.jpg", alt: "disease detection", title: "Saúde" },
+                  { href: "#", src: "https://cdn.prod.website-files.com/612770618d97595db63a9470/63e3ab8c1f55e1f28bfafb68_Rectangle%204545.jpg", alt: "crash detection", title: "Seguros" },
+                  { href: "#", src: "https://cdn.prod.website-files.com/612770618d97595db63a9470/63e3ab8b20155d19eb92f247_Rectangle%204542.jpg", alt: "football player detection", title: "Esportes" },
+                  { href: "#", src: "https://cdn.prod.website-files.com/612770618d97595db63a9470/63e3ab8c23c2ab710877276f_Rectangle%204546.jpg", alt: "robotics", title: "Robótica" },
+                  { href: "#", src: "https://cdn.prod.website-files.com/612770618d97595db63a9470/63e3ab8b3bcbd60cea5c47dd_Rectangle%204547.jpg", alt: "autonomous driving", title: "Condução Autônoma" },
+                  { href: "#", src: "https://cdn.prod.website-files.com/612770618d97595db63a9470/63e3ab8c431b65823393216c_Rectangle%204548.jpg", alt: "aerial imagery", title: "Imagens Aéreas" },
+                  { href: "#", src: "https://cdn.prod.website-files.com/612770618d97595db63a9470/63e3ab8b30772f588458e6a8_Rectangle%204549.jpg", alt: "natural language processing", title: "NLP" },
+                  { href: "#", src: "https://cdn.prod.website-files.com/612770618d97595db63a9470/63e3ab8d049dc15da3e2756c_Rectangle%204550.jpg", alt: "security camera", title: "Segurança e Vigilância" },
+                ].concat([ // Duplicate for seamless loop
+                  { href: "#", src: "https://cdn.prod.website-files.com/612770618d97595db63a9470/63e3ab8c049dc18492e274d8_Rectangle%204543.jpg", alt: "plant leaf disease classification and damage detection", title: "Agricultura" },
+                  { href: "#", src: "https://cdn.prod.website-files.com/612770618d97595db63a9470/63e3ab8c43813b24ada15e1b_Rectangle%204544.jpg", alt: "disease detection", title: "Saúde" },
+                  { href: "#", src: "https://cdn.prod.website-files.com/612770618d97595db63a9470/63e3ab8c1f55e1f28bfafb68_Rectangle%204545.jpg", alt: "crash detection", title: "Seguros" },
+                  { href: "#", src: "https://cdn.prod.website-files.com/612770618d97595db63a9470/63e3ab8b20155d19eb92f247_Rectangle%204542.jpg", alt: "football player detection", title: "Esportes" },
+                  { href: "#", src: "https://cdn.prod.website-files.com/612770618d97595db63a9470/63e3ab8c23c2ab710877276f_Rectangle%204546.jpg", alt: "robotics", title: "Robótica" },
+                  { href: "#", src: "https://cdn.prod.website-files.com/612770618d97595db63a9470/63e3ab8b3bcbd60cea5c47dd_Rectangle%204547.jpg", alt: "autonomous driving", title: "Condução Autônoma" },
+                  { href: "#", src: "https://cdn.prod.website-files.com/612770618d97595db63a9470/63e3ab8c431b65823393216c_Rectangle%204548.jpg", alt: "aerial imagery", title: "Imagens Aéreas" },
+                  { href: "#", src: "https://cdn.prod.website-files.com/612770618d97595db63a9470/63e3ab8b30772f588458e6a8_Rectangle%204549.jpg", alt: "natural language processing", title: "NLP" },
+                  { href: "#", src: "/images/caso7.webp", alt: "security camera", title: "Segurança e Vigilância" },
+                ]).map((item, index) => (
+                  // Aplicando estilos de card mobile corretamente
+                  <a key={`col1-${index}`} href={item.href} className="bg-white rounded-lg shadow-md overflow-hidden block mb-4 w-full md:w-3/4 md:mx-auto">
+                    <img src={item.src} loading="lazy" alt={item.alt} className="w-full h-40 md:h-56 object-cover" />
+                    <div className="p-3 text-center">
+                       <span className="text-gray-800 font-medium text-base">{item.title}</span>
+                    </div>
+                  </a>
+                ))}
+              </div>
+            </div>
+
+            {/* Coluna de Texto e CTA (Centro) */}
+            <div className="col-span-2 md:col-span-1 flex flex-col justify-center order-first md:order-3 px-4 text-center md:text-left">
+              <h2 className="text-3xl font-extrabold text-gray-900 py-8">
+                Potencializando diversas indústrias
+              </h2>
+              <p className="text-lg text-gray-600 mb-6">
+                A Detec-o oferece soluções inovadoras para uma ampla gama de indústrias e casos de uso, desde segurança pública até otimização industrial, varejo e muito mais.
+              </p>
+              <a
+                href="#contato" // Link para a seção de contato ou outra página
+                className="self-center md:self-start bg-blue-700 hover:bg-blue-600 text-white py-3 px-8 rounded-md text-base font-medium"
+              >
+                Solicitar Demonstração
+              </a>
+            </div>
+            
+            {/* Coluna 2 de Imagens (Rolagem para baixo) */}
+            <div className="h-[400px] md:h-[600px] overflow-hidden relative order-3 md:order-2 md:col-span-1">
+               <div className="animate-marquee-vertical-alt space-y-4 absolute top-0 left-0 w-full">
+                 {[
+                   { href: "#", src: "https://cdn.prod.website-files.com/612770618d97595db63a9470/63ea27971842d026d45849c7_Natural%20language%20processing.jpg", alt: "books", title: "NLP" },
+                   { href: "#", src: "/images/caso7.webp", alt: "face mask detection", title: "Segurança e Vigilância" },
+                   { href: "#", src: "https://cdn.prod.website-files.com/612770618d97595db63a9470/63ea2797ccfb335ee0150e4d_Agriculture.jpg", alt: "agriculture annotation", title: "Agricultura" },
+                   { href: "#", src: "https://cdn.prod.website-files.com/612770618d97595db63a9470/63ea2796fd8efb19b62d00a1_Aerial%20imagery.jpg", alt: "aerial imagery", title: "Imagens Aéreas" },
+                   { href: "#", src: "https://cdn.prod.website-files.com/612770618d97595db63a9470/63ea279707e4c263296860cb_Autonomous%20driving.jpg", alt: "autonomous driving", title: "Condução Autônoma" },
+                   { href: "#", src: "https://cdn.prod.website-files.com/612770618d97595db63a9470/63ea27963a093c441c99ce66_Healthcare.jpg", alt: "bone detection", title: "Saúde" },
+                   { href: "#", src: "https://cdn.prod.website-files.com/612770618d97595db63a9470/63ea2798a717a6ab3404e010_Robotics.jpg", alt: "robotics", title: "Robótica" },
+                   { href: "#", src: "https://cdn.prod.website-files.com/612770618d97595db63a9470/63ea279607e4c2c2466860c2_Insurance.jpg", alt: "fire detection", title: "Seguros" },
+                   { href: "#", src: "https://cdn.prod.website-files.com/612770618d97595db63a9470/63ea27974e2d377925d351e2_Sports.jpg", alt: "sport annotation", title: "Esportes" },
+                 ].concat([ // Duplicate for seamless loop
+                   { href: "#", src: "https://cdn.prod.website-files.com/612770618d97595db63a9470/63ea27971842d026d45849c7_Natural%20language%20processing.jpg", alt: "books", title: "NLP" },
+                   { href: "#", src: "/images/caso7.webp", alt: "face mask detection", title: "Segurança e Vigilância" },
+                   { href: "#", src: "https://cdn.prod.website-files.com/612770618d97595db63a9470/63ea2797ccfb335ee0150e4d_Agriculture.jpg", alt: "agriculture annotation", title: "Agricultura" },
+                   { href: "#", src: "https://cdn.prod.website-files.com/612770618d97595db63a9470/63ea2796fd8efb19b62d00a1_Aerial%20imagery.jpg", alt: "aerial imagery", title: "Imagens Aéreas" },
+                   { href: "#", src: "https://cdn.prod.website-files.com/612770618d97595db63a9470/63ea279707e4c263296860cb_Autonomous%20driving.jpg", alt: "autonomous driving", title: "Condução Autônoma" },
+                   { href: "#", src: "https://cdn.prod.website-files.com/612770618d97595db63a9470/63ea27963a093c441c99ce66_Healthcare.jpg", alt: "bone detection", title: "Saúde" },
+                   { href: "#", src: "https://cdn.prod.website-files.com/612770618d97595db63a9470/63ea2798a717a6ab3404e010_Robotics.jpg", alt: "robotics", title: "Robótica" },
+                   { href: "#", src: "https://cdn.prod.website-files.com/612770618d97595db63a9470/63ea279607e4c2c2466860c2_Insurance.jpg", alt: "fire detection", title: "Seguros" },
+                   { href: "#", src: "https://cdn.prod.website-files.com/612770618d97595db63a9470/63ea27974e2d377925d351e2_Sports.jpg", alt: "sport annotation", title: "Esportes" },
+                 ]).map((item, index) => (
+                   // Aplicando estilos de card mobile corretamente
+                  <a key={`col2-${index}`} href={item.href} className="bg-white rounded-lg shadow-md overflow-hidden block mb-4 w-full md:w-3/4 md:mx-auto">
+                    <img src={item.src} loading="lazy" alt={item.alt} className="w-full h-40 md:h-56 object-cover" />
+                    <div className="p-3 text-center">
+                      <span className="text-gray-800 font-medium text-base">{item.title}</span>
+                    </div>
+                  </a>
+                 ))}
+               </div>
+            </div>
+
+          </div>
+        </div>
+        {/* Definir animações CSS e estilos locais */}
+        {/* Note: A duração da animação (60s) pode precisar de ajuste */}
+        <style jsx>{`
+          @keyframes marquee-vertical {
+            0% { transform: translateY(0%); }
+            100% { transform: translateY(-50%); } /* Metade porque duplicamos o conteúdo */
+          }
+          @keyframes marquee-vertical-alt {
+            0% { transform: translateY(-50%); } /* Começa da metade */
+            100% { transform: translateY(0%); } /* Volta ao início */
+          }
+          .animate-marquee-vertical {
+            /* A altura total será dinâmica baseada no conteúdo, a animação move metade */
+            animation: marquee-vertical 60s linear infinite;
+            will-change: transform;
+          }
+           .animate-marquee-vertical:hover {
+             animation-play-state: paused; /* Pausar no hover */
+           }
+          .animate-marquee-vertical-alt {
+            /* A altura total será dinâmica baseada no conteúdo, a animação move metade */
+            animation: marquee-vertical-alt 60s linear infinite;
+            will-change: transform;
+          }
+          .animate-marquee-vertical-alt:hover {
+             animation-play-state: paused; /* Pausar no hover */
+           }
+        `}</style>
       </div>
 
       {/* Integração com Equipamentos Existentes */}

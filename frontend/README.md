@@ -1,12 +1,59 @@
-# React + Vite
+# Detec-O Frontend
 
-This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.
+Frontend para o sistema Detec-O de detecção de ameaças.
 
-Currently, two official plugins are available:
+## Configuração Simplificada
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react/README.md) uses [Babel](https://babeljs.io/) for Fast Refresh
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react-swc) uses [SWC](https://swc.rs/) for Fast Refresh
+Esta versão do frontend se conecta a um backend simplificado que fornece dados de demonstração.
 
-## Expanding the ESLint configuration
+### Requisitos
 
-If you are developing a production application, we recommend using TypeScript and enable type-aware lint rules. Check out the [TS template](https://github.com/vitejs/vite/tree/main/packages/create-vite/template-react-ts) to integrate TypeScript and [`typescript-eslint`](https://typescript-eslint.io) in your project.
+- Node.js 16+
+- NPM ou Yarn
+
+### Instalação
+
+```bash
+# Instalar dependências
+npm install
+```
+
+### Execução
+
+1. Inicie o backend simplificado:
+
+```bash
+# Na pasta backend
+cd backend
+start_simple_server.bat  # No Windows
+# OU
+python app/simpleauth.py  # Em sistemas Unix
+```
+
+2. Inicie o frontend:
+
+```bash
+# Na pasta frontend
+npm run dev
+```
+
+3. Acesse o frontend em http://localhost:5173
+
+### Credenciais de Acesso
+
+- **Email**: admin@detec-o.com
+- **Senha**: admin123
+
+## Funcionalidades
+
+- Dashboard com estatísticas
+- Visualização de câmeras
+- Lista de eventos
+- Gerenciamento de alertas
+
+## Tecnologias Utilizadas
+
+- React.js
+- Axios para requisições HTTP
+- Vite como bundler
+- TailwindCSS para estilização
