@@ -5,6 +5,8 @@ import EventImage from '../components/EventImage';
 import FeedbackControl from '../components/FeedbackControl';
 import { formatDistanceToNow } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
+import axios from 'axios';
+import { useAuth } from '../context/AuthContext';
 
 function EventsPage() {
   const [events, setEvents] = useState([]);
@@ -35,6 +37,14 @@ function EventsPage() {
   // Estado para o modal de detalhes
   const [showModal, setShowModal] = useState(false);
   
+  // Estados para o vídeo do modal
+  const [videoUrl, setVideoUrl] = useState(null);
+  const [videoLoading, setVideoLoading] = useState(false);
+  const [videoError, setVideoError] = useState(null);
+
+  // Pegar token do contexto
+  const { token } = useAuth();
+
   // Estado para o feedback do evento
   const [feedbackConfidence, setFeedbackConfidence] = useState(50);
   const [feedbackType, setFeedbackType] = useState("true_positive");
@@ -84,13 +94,17 @@ function EventsPage() {
       if (filterDays > 0) {
         const fromDate = new Date();
         fromDate.setDate(fromDate.getDate() - filterDays);
-        params.from_date = fromDate.toISOString().split('T')[0];
+        params.start_date = fromDate.toISOString();
       } else if (filterDateStart) {
-        params.from_date = filterDateStart;
+        try {
+          params.start_date = new Date(filterDateStart + 'T00:00:00Z').toISOString();
+        } catch (e) { console.error("Data inicial inválida:", filterDateStart); }
       }
       
       if (filterDateEnd) {
-        params.to_date = filterDateEnd;
+        try {
+          params.end_date = new Date(filterDateEnd + 'T23:59:59Z').toISOString();
+        } catch (e) { console.error("Data final inválida:", filterDateEnd); }
       }
       
       if (filterCameraId) {
@@ -106,10 +120,15 @@ function EventsPage() {
       }
       
       if (filterFeedback) {
-        params.feedback = filterFeedback;
+        params.feedback_status = filterFeedback;
       }
+
+      // Calcular skip para paginação
+      params.skip = (currentPage - 1) * eventsPerPage;
+      params.limit = eventsPerPage;
       
       // Buscar dados da API
+      console.log("Enviando parâmetros para getEvents:", params);
       const data = await eventService.getEvents(params);
       
       // Atualizar estados com os dados recebidos
@@ -158,6 +177,60 @@ function EventsPage() {
     setTotalPages(Math.ceil(totalEvents / eventsPerPage));
   }, [totalEvents, eventsPerPage]);
 
+  // Efeito para buscar o vídeo quando o modal é aberto (selectedEvent muda)
+  useEffect(() => {
+    let currentVideoUrl = null; // Guardar a URL para revogar na limpeza
+
+    const fetchVideoForModal = async (eventId) => {
+      if (!eventId || !token) return; // Não busca sem ID ou token
+
+      setVideoLoading(true);
+      setVideoError(null);
+      setVideoUrl(null); 
+      
+      console.log('Token usado para buscar vídeo no modal:', token); // Log para depuração
+
+      try {
+        const response = await axios.get(`/api/events/${eventId}/video`, {
+          headers: { Authorization: `Bearer ${token}` },
+          responseType: 'blob',
+        });
+
+        const blob = new Blob([response.data], { type: 'video/mp4' });
+        currentVideoUrl = URL.createObjectURL(blob);
+        setVideoUrl(currentVideoUrl);
+
+      } catch (err) {
+        console.error('Erro ao buscar vídeo para o modal:', err);
+        if (err.response && err.response.status === 404) {
+          setVideoError('Vídeo não encontrado para este evento.');
+        } else {
+          setVideoError('Não foi possível carregar o vídeo.');
+        }
+        setVideoUrl(null);
+      } finally {
+        setVideoLoading(false);
+      }
+    };
+
+    if (selectedEvent) {
+      fetchVideoForModal(selectedEvent.id);
+    }
+
+    // Função de limpeza: Revoga URL e reseta estados quando o modal fecha
+    return () => {
+      if (currentVideoUrl) {
+        console.log("Revogando Object URL do modal:", currentVideoUrl);
+        URL.revokeObjectURL(currentVideoUrl);
+      }
+      // Resetar estados do vídeo ao fechar o modal (selectedEvent vira null)
+      // Isso garante que o estado de loading/erro não persista se reabrir rápido
+      setVideoUrl(null);
+      setVideoLoading(false);
+      setVideoError(null);
+    };
+  }, [selectedEvent, token]); // Depende de selectedEvent e token
+
   // Helper para formatar data
   const formatDate = (dateString) => {
     try {
@@ -197,14 +270,14 @@ function EventsPage() {
   };
 
   // Lidar com mudança de feedback (usado no modal de detalhes)
-  const handleFeedbackChange = (eventId, newFeedback) => {
+  const handleFeedbackChange = (eventId, newFeedbackStatus) => {
     setEvents(prev => prev.map(event => 
-      event.id === eventId ? { ...event, feedback: newFeedback } : event
+      event.id === eventId ? { ...event, feedback_status: newFeedbackStatus } : event
     ));
     
     // Se o evento atual estiver aberto no modal, atualizar também
     if (selectedEvent && selectedEvent.id === eventId) {
-      setSelectedEvent(prev => ({ ...prev, feedback: newFeedback }));
+      setSelectedEvent(prev => ({ ...prev, feedback_status: newFeedbackStatus }));
     }
   };
 
@@ -239,7 +312,7 @@ function EventsPage() {
     const indicator = indicators[feedback] || { color: 'bg-gray-500', text: feedback };
     
     return (
-      <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${indicator.color} text-white`}>
+      <span className={`ml-2 inline-flex items-center px-2 py-0.5 rounded-sm text-xs font-medium ${indicator.color} text-white`}>
         {indicator.text}
       </span>
     );
@@ -468,10 +541,10 @@ function EventsPage() {
                                 {Math.round(event.confidence * 100)}%
                               </div>
                             )}
-                            {event.feedback && (
+                            {event.feedback_status && (
                               <div>
                                 <span className="text-gray-400">Feedback: </span>
-                                {renderFeedbackIndicator(event.feedback)}
+                                {renderFeedbackIndicator(event.feedback_status)}
                               </div>
                             )}
                           </div>
@@ -513,7 +586,7 @@ function EventsPage() {
                               {event.confidence ? `${Math.round(event.confidence * 100)}%` : 'N/A'}
                             </td>
                             <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-300">
-                              {renderFeedbackIndicator(event.feedback)}
+                              {renderFeedbackIndicator(event.feedback_status)}
                             </td>
                             <td className="px-6 py-4 whitespace-nowrap text-sm text-right">
                               <button
@@ -657,7 +730,7 @@ function EventsPage() {
             ></div>
 
             {/* Modal central */}
-            <div className="inline-block align-bottom bg-gray-800 rounded-lg text-left overflow-hidden shadow-xl transform transition-all sm:my-8 sm:align-middle sm:max-w-3xl sm:w-full">
+            <div className="inline-block align-bottom bg-gray-800 rounded-lg text-left w-full overflow-hidden shadow-xl transform transition-all sm:my-8 sm:align-middle sm:max-w-3xl sm:w-full">
               <div className="bg-gray-800 px-4 pt-5 pb-4 sm:p-6 sm:pb-4">
                 <div className="sm:flex sm:items-start">
                   <div className="mt-3 sm:mt-0 sm:ml-4 w-full">
@@ -676,21 +749,49 @@ function EventsPage() {
                       </button>
                     </div>
                     
-                    <div className="mt-4 grid grid-cols-1 md:grid-cols-5 gap-4">
-                      {/* Coluna da imagem */}
+                    <div className="mt-2 grid grid-cols-1 md:grid-cols-5 gap-4">
+                      {/* Coluna da imagem/vídeo */}
                       <div className="md:col-span-3">
-                        <EventImage 
-                          eventId={selectedEvent.id} 
-                          eventData={selectedEvent}
-                          showBoundingBoxes={true}
-                          className="bg-gray-900 rounded"
-                        />
+                        <div className="bg-gray-900 rounded flex items-center justify-center min-h-[200px] max-h-80"> 
+                          {videoLoading && (
+                            <div className="text-center py-10">
+                              <div className="loader-small mx-auto mb-2"></div> {/* Usar classe de loader */} 
+                              <p className="text-gray-400">Carregando vídeo...</p>
+                            </div>
+                          )}
+                          {videoError && !videoLoading && (
+                            <div className="text-red-400 text-center py-10">
+                              <svg xmlns="http://www.w3.org/2000/svg" className="h-12 w-12 mx-auto mb-2 opacity-75" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                              </svg>
+                              <p>{videoError}</p>
+                            </div>
+                          )}
+                          {videoUrl && !videoLoading && !videoError && (
+                            <video 
+                              controls
+                              src={videoUrl} 
+                              className="max-w-full max-h-full rounded" // Usar max-h-full do container
+                            >
+                              Seu navegador não suporta o elemento de vídeo.
+                            </video>
+                          )}
+                          {/* Placeholder inicial antes do loading começar */} 
+                          {!videoLoading && !videoError && !videoUrl && (
+                            <div className="text-gray-400 text-center py-10">
+                              <svg xmlns="http://www.w3.org/2000/svg" className="h-16 w-16 mx-auto mb-2 opacity-50" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 10l4.553-2.276A1 1 0 0121 8.618v6.764a1 1 0 01-1.447.894L15 14M4 18h11a1 1 0 001-1V7a1 1 0 00-1-1H4a1 1 0 00-1 1v10a1 1 0 001 1z" />
+                              </svg>
+                              <p>Vídeo indisponível</p>
+                            </div>
+                          )}
+                        </div>
                         
                         {/* Controle de feedback */}
                         <FeedbackControl 
                           eventId={selectedEvent.id} 
-                          initialValue={selectedEvent.feedback}
-                          onFeedbackSubmit={(value) => handleFeedbackChange(selectedEvent.id, value)} 
+                          initialValue={selectedEvent.feedback_status}
+                          onFeedbackSubmit={(statusValue) => handleFeedbackChange(selectedEvent.id, statusValue)} 
                         />
                       </div>
                       
@@ -752,13 +853,23 @@ function EventsPage() {
                         {/* Botões de ação */}
                         <div className="pt-4 border-t border-gray-700">
                           <button
-                            className="mt-2 w-full inline-flex justify-center items-center px-4 py-2 border border-gray-700 rounded-md shadow-sm text-sm font-medium text-gray-300 bg-gray-700 hover:bg-gray-600"
-                            onClick={() => {/* Implementar download */}}
+                            // Botão transformado em link para download
+                            as="a" 
+                            href={videoUrl} // <<< Usa a URL do blob
+                            download={`evento_${selectedEvent?.id}.mp4`} 
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className={`mt-2 w-full inline-flex justify-center items-center px-4 py-2 border border-gray-700 rounded-md shadow-sm text-sm font-medium 
+                              ${videoUrl ? 
+                                'text-gray-300 bg-gray-700 hover:bg-gray-600' : 
+                                'text-gray-500 bg-gray-600 cursor-not-allowed'}
+                            `}
+                            onClick={(e) => !videoUrl && e.preventDefault()} // Impede clique se não houver URL
                           >
                             <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
                             </svg>
-                            Baixar Imagem
+                            Baixar Vídeo
                           </button>
                         </div>
                       </div>

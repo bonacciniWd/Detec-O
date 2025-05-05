@@ -243,13 +243,13 @@ const DetectionSettings = ({ cameraId, onSave }) => {
                 {settings.enabled ? 'Ativada' : 'Desativada'}
               </span>
             </div>
-          </div>
-          
+      </div>
+      
           {/* Threshold de confiança */}
           <div className="mb-4">
             <label className="block text-gray-300 mb-2">
               Limiar de Confiança: {settings.confidence_threshold.toFixed(2)}
-            </label>
+          </label>
             <input
               type="range"
               min="0.1"
@@ -263,14 +263,14 @@ const DetectionSettings = ({ cameraId, onSave }) => {
               <span>0.1</span>
               <span>0.5</span>
               <span>1.0</span>
-            </div>
           </div>
-          
+        </div>
+        
           {/* Intervalo de detecção */}
           <div className="mb-4">
             <label className="block text-gray-300 mb-2">
               Intervalo de Detecção: {settings.detection_interval} frames
-            </label>
+          </label>
             <input
               type="range"
               min="1"
@@ -284,18 +284,18 @@ const DetectionSettings = ({ cameraId, onSave }) => {
               <span>1</span>
               <span>15</span>
               <span>30</span>
-            </div>
           </div>
-          
+        </div>
+        
           {/* Classes de objetos */}
           <div className="mb-4">
             <label className="block text-gray-300 mb-2">
               Objetos a Detectar
-            </label>
+          </label>
             <div className="grid grid-cols-2 gap-2">
               {renderClassCheckboxes(availableObjectClasses, settings.object_classes, 'object', toggleObjectClass)}
             </div>
-          </div>
+        </div>
         
           {/* --- Classes de comportamento (Temporariamente Oculto) --- */}
           {/* 
@@ -305,7 +305,7 @@ const DetectionSettings = ({ cameraId, onSave }) => {
             </label>
             <div className="grid grid-cols-2 gap-2">
               {renderClassCheckboxes(availableBehaviorClasses, settings.behavior_classes, 'behavior', toggleBehaviorClass)}
-            </div>
+              </div>
           </div>
           */}
         
@@ -315,8 +315,8 @@ const DetectionSettings = ({ cameraId, onSave }) => {
               Ações
             </label>
             <div className="flex items-center mb-2">
-              <input
-                type="checkbox"
+            <input
+              type="checkbox"
                 id="alert-on-detection"
                 checked={!!settings.alert_on_detection}
                 onChange={(e) => handleSettingChange('alert_on_detection', e.target.checked)}
@@ -327,20 +327,20 @@ const DetectionSettings = ({ cameraId, onSave }) => {
                 className="ml-2 text-sm text-gray-300"
               >
                 Alertar quando objetos perigosos forem detectados
-              </label>
-            </div>
+            </label>
           </div>
+        </div>
         
           {/* Botão de salvar */}
           <div className="mt-6">
-            <button
+          <button
               onClick={saveSettings}
               disabled={isLoading}
               className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-md"
             >
               {isLoading ? 'Salvando...' : 'Salvar Configurações'}
-            </button>
-          </div>
+          </button>
+        </div>
         
           {/* Testes de Detecção */}
           <div className="mt-8 border-t border-gray-700 pt-4">
@@ -350,7 +350,7 @@ const DetectionSettings = ({ cameraId, onSave }) => {
               <label className="block text-gray-300 mb-2">
                 Upload de Imagem para Teste
               </label>
-              <input
+                <input
                 type="file"
                 accept="image/*"
                 onChange={handleImageChange}
@@ -392,7 +392,7 @@ const DetectionSettings = ({ cameraId, onSave }) => {
                   <p className="text-gray-300">
                     <span className="font-medium">Tempo de Inferência:</span> {(detectionResult.statistics.inference_time * 1000).toFixed(1)}ms
                   </p>
-                </div>
+            </div>
                 
                 {detectionResult.image_result && (
                   <div>
@@ -402,9 +402,9 @@ const DetectionSettings = ({ cameraId, onSave }) => {
                       alt="Detection Result" 
                       className="max-w-full rounded-md" 
                     />
-                  </div>
-                )}
-                
+          </div>
+        )}
+        
                 {detectionResult.detections.length > 0 && (
                   <div className="mt-4">
                     <p className="text-white font-medium mb-2">Detecções:</p>
@@ -422,12 +422,12 @@ const DetectionSettings = ({ cameraId, onSave }) => {
                           )}
                         </div>
                       ))}
-                    </div>
-                  </div>
+          </div>
+        </div>
                 )}
               </div>
             )}
-          </div>
+      </div>
         </>
       )}
     </div>

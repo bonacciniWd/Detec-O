@@ -442,9 +442,9 @@ function CamerasPage() {
               // const snapshotFilename = getSnapshotFilename(camera.last_event?.image_path); 
 
               return (
-                <div key={camera.id} className="border rounded-lg overflow-hidden">
-                  <div className="flex flex-col md:flex-row">
-                    {/* Thumbnail da câmera */}
+              <div key={camera.id} className="border rounded-lg overflow-hidden">
+                <div className="flex flex-col md:flex-row">
+                  {/* Thumbnail da câmera */}
                     <div className="w-full md:w-1/3 lg:w-1/4 bg-gray-700 flex items-center justify-center text-gray-400">
                       {/* Tentar exibir snapshot se path existir */}
                       {snapshotFilename ? (
@@ -454,12 +454,12 @@ function CamerasPage() {
                           alt={`Snapshot de ${camera.name}`}
                           className="w-full h-full object-cover"
                           // Adicionar onError para imagem de fallback
-                          onError={(e) => {
+                        onError={(e) => {
                             e.target.onerror = null; // Previne loop de erro
                             e.target.src = '/camera-offline.png'; // Imagem de fallback genérica
                             e.target.alt = `${camera.name} (Snapshot indisponível)`
-                          }}
-                        />
+                        }}
+                      />
                       ) : (
                         // Placeholder se não houver snapshot
                         <svg xmlns="http://www.w3.org/2000/svg" className="h-16 w-16" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -467,50 +467,50 @@ function CamerasPage() {
                           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 13a3 3 0 11-6 0 3 3 0 016 0z" />
                         </svg>
                       )}
-                    </div>
-                    
-                    {/* Informações da câmera */}
+                  </div>
+                  
+                  {/* Informações da câmera */}
                     <div className="p-4 flex-1 bg-gray-800 text-white">
-                      <div className="flex flex-wrap justify-between items-start">
-                        <div>
-                          <h3 className="text-lg font-medium">{camera.name}</h3>
-                          <p className="text-sm text-gray-500">
-                            {camera.location && `${camera.location} • `}
-                            {camera.manufacturer} {camera.model || ''}
-                          </p>
-                          <p className="text-xs text-gray-400">
+                    <div className="flex flex-wrap justify-between items-start">
+                      <div>
+                        <h3 className="text-lg font-medium">{camera.name}</h3>
+                        <p className="text-sm text-gray-500">
+                          {camera.location && `${camera.location} • `}
+                          {camera.manufacturer} {camera.model || ''}
+                        </p>
+                        <p className="text-xs text-gray-400">
                             {camera.ip_address}:{camera.port} {/* Usar ip_address e port */} 
-                          </p>
-                        </div>
-                        
-                        <div className="flex items-center space-x-2 mt-2 md:mt-0">
-                          <button 
-                            className={`px-3 py-1 rounded text-sm ${expandedSettings === camera.id ? 'bg-blue-100 text-blue-700' : 'bg-gray-100 text-gray-700 hover:bg-gray-200'}`}
-                            onClick={() => toggleExpandSettings(camera.id)}
-                          >
-                            Configurações
-                          </button>
-                          <button 
-                            className="bg-red-100 text-red-700 hover:bg-red-200 px-3 py-1 rounded text-sm"
-                            onClick={() => confirmDeleteCamera(camera)}
-                          >
-                            Excluir
-                          </button>
-                        </div>
+                        </p>
                       </div>
                       
-                      {/* Settings expandidos */}
-                      {expandedSettings === camera.id && (
-                        <div className="mt-4 border-t pt-4">
-                          <DetectionSettings 
-                            cameraId={camera.id}
-                            onSave={(settings) => handleSaveDetectionSettings(camera.id, settings)}
-                          />
-                        </div>
-                      )}
+                      <div className="flex items-center space-x-2 mt-2 md:mt-0">
+                        <button 
+                          className={`px-3 py-1 rounded text-sm ${expandedSettings === camera.id ? 'bg-blue-100 text-blue-700' : 'bg-gray-100 text-gray-700 hover:bg-gray-200'}`}
+                          onClick={() => toggleExpandSettings(camera.id)}
+                        >
+                          Configurações
+                        </button>
+                        <button 
+                          className="bg-red-100 text-red-700 hover:bg-red-200 px-3 py-1 rounded text-sm"
+                          onClick={() => confirmDeleteCamera(camera)}
+                        >
+                          Excluir
+                        </button>
+                      </div>
                     </div>
+                    
+                    {/* Settings expandidos */}
+                    {expandedSettings === camera.id && (
+                      <div className="mt-4 border-t pt-4">
+                        <DetectionSettings 
+                          cameraId={camera.id}
+                          onSave={(settings) => handleSaveDetectionSettings(camera.id, settings)}
+                        />
+                      </div>
+                    )}
                   </div>
                 </div>
+              </div>
               );
             })}
           </div>

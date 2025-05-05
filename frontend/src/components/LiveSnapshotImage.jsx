@@ -2,7 +2,12 @@ import React, { useState, useEffect, useRef } from 'react';
 import PropTypes from 'prop-types';
 import cameraService from '../services/cameraService'; // Importar o serviço
 
-const LiveSnapshotImage = ({ cameraId, interval = 5000, className = '' }) => {
+const LiveSnapshotImage = ({ 
+  cameraId, 
+  isCameraActive, // Nova prop para indicar se a câmera está ativa
+  interval = 5000, 
+  className = '' 
+}) => {
   const [imageUrl, setImageUrl] = useState('/camera-offline.png'); // Começa com fallback
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState(null);
@@ -11,12 +16,30 @@ const LiveSnapshotImage = ({ cameraId, interval = 5000, className = '' }) => {
   const isMounted = useRef(true); // Ref para verificar se o componente está montado
 
   const fetchSnapshot = async () => {
-    if (!cameraId) return;
-    // console.log(`[LiveSnapshot ${cameraId}] Fetching new snapshot...`);
+    // Não buscar se a câmera não estiver ativa ou não tiver ID
+    if (!isCameraActive || !cameraId) {
+      // console.log(`[LiveSnapshot ${cameraId}] Skipping fetch, camera inactive or no ID.`);
+      // Garantir que a imagem de offline seja exibida se estava mostrando outra coisa
+      if (imageUrl !== '/camera-offline.png') {
+         setImageUrl('/camera-offline.png');
+      }
+      // Limpar URL de objeto antiga se existir
+      if (currentObjectURL.current) {
+        URL.revokeObjectURL(currentObjectURL.current);
+        currentObjectURL.current = null;
+      }
+      setIsLoading(false); // Garantir que loading não fique preso
+      setError(null); // Limpar erro anterior
+      return;
+    }
+    
+    // console.log(`[LiveSnapshot ${cameraId}] Fetching new snapshot (camera active)...`);
     setIsLoading(true);
     setError(null);
     try {
-      const blob = await cameraService.getCameraSnapshotBlob(cameraId);
+      // Usar force=true aqui? Ou deixar o backend decidir (placeholder)? 
+      // Por enquanto, chamaremos sem force=true, confiando no backend para retornar placeholder se necessário.
+      const blob = await cameraService.getCameraSnapshotBlob(cameraId); // <<< Chamada continua aqui
 
       // Limpar URL antiga antes de criar a nova
       if (currentObjectURL.current) {
@@ -50,10 +73,16 @@ const LiveSnapshotImage = ({ cameraId, interval = 5000, className = '' }) => {
 
   useEffect(() => {
     isMounted.current = true; // Marcar como montado
-    fetchSnapshot(); // Busca inicial
+    fetchSnapshot(); // Busca inicial (já considera isCameraActive)
 
-    // Configurar intervalo para busca periódica
-    if (interval > 0) {
+    // Limpar intervalo anterior ao reconfigurar
+    if (intervalId.current) {
+      clearInterval(intervalId.current);
+      intervalId.current = null;
+    }
+
+    // Configurar intervalo para busca periódica APENAS se a câmera estiver ativa
+    if (interval > 0 && isCameraActive) {
       intervalId.current = setInterval(fetchSnapshot, interval);
     }
 
@@ -68,7 +97,8 @@ const LiveSnapshotImage = ({ cameraId, interval = 5000, className = '' }) => {
         URL.revokeObjectURL(currentObjectURL.current);
       }
     };
-  }, [cameraId, interval]); // Re-executar se ID ou intervalo mudarem
+    // Re-executar se ID, intervalo OU ESTADO DA CÂMERA mudarem
+  }, [cameraId, interval, isCameraActive]); 
 
   return (
     <div className={`relative ${className}`}>
@@ -96,6 +126,7 @@ const LiveSnapshotImage = ({ cameraId, interval = 5000, className = '' }) => {
 
 LiveSnapshotImage.propTypes = {
   cameraId: PropTypes.string.isRequired,
+  isCameraActive: PropTypes.bool.isRequired, // Adicionar propType
   interval: PropTypes.number, // Intervalo em ms para refresh
   className: PropTypes.string,
 };

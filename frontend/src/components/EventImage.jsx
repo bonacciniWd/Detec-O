@@ -135,16 +135,16 @@ const EventImage = ({
       
       {/* Renderizar imagem apenas se a URL existir e não houver erro */}
       {!hasError && imageUrl && (
-        <img
-          ref={imageRef}
+      <img
+        ref={imageRef}
           key={imageUrl} // Adicionar key para forçar reload se URL mudar
-          src={imageUrl}
-          alt={imageAltText}
-          className={`${widthClass} ${heightClass} rounded ${hasError ? 'hidden' : 'block'} ${fullWidth ? '' : 'max-h-[400px] object-contain'}`}
-          onLoad={handleImageLoad}
-          onError={handleImageError}
-          onClick={onClick}
-        />
+        src={imageUrl}
+        alt={imageAltText}
+        className={`${widthClass} ${heightClass} rounded ${hasError ? 'hidden' : 'block'} ${fullWidth ? '' : 'max-h-[400px] object-contain'}`}
+        onLoad={handleImageLoad}
+        onError={handleImageError}
+        onClick={onClick}
+      />
       )}
       
       {/* Container para as bounding boxes */}

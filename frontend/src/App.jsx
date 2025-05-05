@@ -17,6 +17,7 @@ import NotFoundPage from './pages/NotFoundPage';
 import LandingPage from './pages/LandingPage';
 import CameraDashboard from './pages/CameraDashboard';
 import AddCameraPage from './pages/AddCameraPage';
+import PeoplePage from './pages/PeoplePage';
 
 // Layout
 import MainLayout from './components/MainLayout';
@@ -150,6 +151,15 @@ function App() {
             <ProtectedRoute>
               <MainLayout>
                 <AddCameraPage />
+              </MainLayout>
+            </ProtectedRoute>
+          } />
+          
+          {/* Rota para gestão de pessoas */}
+          <Route path="/pessoas" element={
+            <ProtectedRoute>
+              <MainLayout>
+                <PeoplePage />
               </MainLayout>
             </ProtectedRoute>
           } />

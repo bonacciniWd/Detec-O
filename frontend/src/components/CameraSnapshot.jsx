@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import axios from 'axios';
 import { useAuth } from '../context/AuthContext';
+import PropTypes from 'prop-types';
 
 /**
  * Componente para exibir snapshots de câmeras com atualização periódica.
@@ -8,6 +9,7 @@ import { useAuth } from '../context/AuthContext';
 const CameraSnapshot = ({
   deviceId,
   streamId,
+  isCameraActive,
   cameraName = '',
   interval = 5000,
   onExpand,
@@ -27,7 +29,9 @@ const CameraSnapshot = ({
 
   // Função para buscar o snapshot da câmera
   const fetchSnapshot = async () => {
-    if (updating) return; // Evita múltiplas requisições simultâneas
+    if (!isCameraActive || !deviceId || updating) {
+      return;
+    } 
     
     try {
       setUpdating(true);
@@ -64,27 +68,37 @@ const CameraSnapshot = ({
 
   // Configurar o intervalo de atualização
   useEffect(() => {
-    if (autoRefresh) {
-      fetchSnapshot(); // Busca inicial
-      
-      // Configura o intervalo para atualizações periódicas
-      intervalRef.current = setInterval(fetchSnapshot, interval);
-    } else {
-      fetchSnapshot(); // Busca única
+    if (intervalRef.current) {
+      clearInterval(intervalRef.current);
+      intervalRef.current = null;
     }
     
-    // Limpar o intervalo ao desmontar o componente
+    if (imageUrl) {
+      URL.revokeObjectURL(imageUrl);
+      setImageUrl(null);
+    }
+    
+    if (isCameraActive) {
+      fetchSnapshot(); 
+    } else {
+      setLoading(false);
+      setError(null);
+    }
+
+    if (autoRefresh && isCameraActive) {
+      intervalRef.current = setInterval(fetchSnapshot, interval);
+    } 
+    
     return () => {
       if (intervalRef.current) {
         clearInterval(intervalRef.current);
       }
       
-      // Limpar URL do objeto ao desmontar
       if (imageUrl) {
         URL.revokeObjectURL(imageUrl);
       }
     };
-  }, [deviceId, streamId, interval, autoRefresh, quality]);
+  }, [deviceId, streamId, interval, autoRefresh, quality, isCameraActive]);
 
   // Calcular tempo desde a última atualização
   const getTimeSinceUpdate = () => {
@@ -158,6 +172,20 @@ const CameraSnapshot = ({
       )}
     </div>
   );
+};
+
+CameraSnapshot.propTypes = {
+  deviceId: PropTypes.string.isRequired,
+  streamId: PropTypes.string.isRequired,
+  isCameraActive: PropTypes.bool.isRequired,
+  cameraName: PropTypes.string,
+  interval: PropTypes.number,
+  onExpand: PropTypes.func,
+  onError: PropTypes.func,
+  className: PropTypes.string,
+  showControls: PropTypes.bool,
+  autoRefresh: PropTypes.bool,
+  quality: PropTypes.string
 };
 
 export default CameraSnapshot; 

@@ -8,7 +8,7 @@ import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer,
   PieChart, Pie, Cell, LineChart, Line, AreaChart, Area
 } from 'recharts';
-import { startOfDay, format, subDays, parseISO } from 'date-fns';
+import { startOfDay, format, subDays, parseISO, formatISO } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 
 // Cores para gráficos
@@ -27,141 +27,120 @@ function DashboardPage() {
     totalEvents: 0,
     eventsByType: {},
     recentEvents: [],
-    eventsByZone: [],
     eventsBySeverity: [],
     eventsTimeSeries: [],
+    eventsByHour: [],
     detectionAccuracy: 0
   });
 
   const [isLoading, setIsLoading] = useState(true);
   const [isLoadingEvents, setIsLoadingEvents] = useState(false);
   const [eventsError, setEventsError] = useState(null);
-  const [timeRange, setTimeRange] = useState('7d'); // '24h', '7d', '30d'
+  const [timeRange, setTimeRange] = useState('30d');
   const [activeTab, setActiveTab] = useState('overview'); // 'overview', 'cameras', 'events', 'zones'
 
-  useEffect(() => {
-    const fetchDashboardData = async () => {
+  const fetchDashboardData = async (rangeOverride = null) => {
+    const currentRange = rangeOverride || timeRange;
+    
+    if (rangeOverride) {
       setIsLoading(true);
-      try {
-        setEventsError(null);
-        
-        // Fazer múltiplas requisições em paralelo
-        const [camerasResponse, eventsResponse] = await Promise.all([
-          api.get('/v1/cameras'),
-          api.get('/v1/events', { params: { limit: 50 } })
-        ]).catch(error => {
-          console.error("Erro nas requisições:", error);
-          return [{ data: [] }, { data: { events: [] } }]; // Valores padrão em caso de erro
-        });
+    }
 
-        // Processar dados das câmeras - garantir que é um array
-        const cameraList = Array.isArray(camerasResponse.data) ? camerasResponse.data : [];
-        
-        // Processar dados dos eventos - garantir que é um array
-        const eventsList = Array.isArray(eventsResponse.data?.events) ? eventsResponse.data.events : [];
-        
-        // Calcular estatísticas básicas
-        const activeCameras = cameraList.filter(cam => cam.running || cam.detection_enabled).length;
-        
-        // Calcular distribuição por tipo de evento
-        const eventsByType = eventsList.reduce((acc, event) => {
-          acc[event.event_type] = (acc[event.event_type] || 0) + 1;
-          return acc;
-        }, {});
-        
-        // Calcular distribuição por severidade
-        const eventsBySeverity = eventsList.reduce((acc, event) => {
-          const severity = event.severity || 'blue';
-          acc[severity] = (acc[severity] || 0) + 1;
-          return acc;
-        }, {});
+    try {
+      setEventsError(null);
+      
+      const endDate = new Date();
+      let startDate;
+      switch (currentRange) {
+        case '24h':
+          startDate = subDays(endDate, 1);
+          break;
+        case '30d':
+          startDate = subDays(endDate, 30);
+          break;
+        case '7d':
+        default:
+          startDate = subDays(endDate, 7);
+      }
+      const paramsDateFilter = {
+        start_date: formatISO(startDate, { representation: 'date' }),
+        end_date: formatISO(endDate, { representation: 'date' })
+      };
 
-        // Formatar dados para o gráfico de severidade
-        const severityChartData = Object.keys(eventsBySeverity).map(key => ({
-          name: key === 'red' ? 'Crítico' : key === 'yellow' ? 'Atenção' : 'Informativo',
-          value: eventsBySeverity[key],
-          color: SEVERITY_COLORS[key] || '#999'
-        }));
-        
-        // Calcular eventos por zona (mock data, em produção viria da API)
-        const eventsByZone = [
-          { name: 'Entrada Principal', events: 18, trustedEvents: 15 },
-          { name: 'Estacionamento', events: 12, trustedEvents: 9 },
-          { name: 'Perímetro', events: 8, trustedEvents: 7 },
-          { name: 'Recepção', events: 5, trustedEvents: 5 }
-        ];
-        
-        // Calcular série temporal para últimos 7 dias (mock data, em produção viria da API)
-        const now = new Date();
-        const eventsTimeSeries = Array.from({ length: 7 }, (_, i) => {
-          const date = subDays(now, 6 - i);
+      const [camerasResponse, generalEventsResponse, timeSeriesResponse, hourlyResponse] = await Promise.all([
+        api.get('/api/cameras/'),
+        api.get('/api/events/', { params: { limit: 50 } }),
+        eventService.getEventTimeSeries(paramsDateFilter),
+        eventService.getEventHourlyDistribution(paramsDateFilter)
+      ]).catch(error => {
+        console.error("[DashboardPage] Erro no Promise.all:", error);
+        return [{ data: [] }, { data: [] }, [], []]; 
+      });
+
+      const cameraList = Array.isArray(camerasResponse.data) ? camerasResponse.data : [];
+      const eventsList = Array.isArray(generalEventsResponse.data) ? generalEventsResponse.data : [];
+      const activeCameras = cameraList.filter(cam => cam.running || cam.detection_enabled).length;
+      const eventsByType = eventsList.reduce((acc, event) => {
+        acc[event.event_type] = (acc[event.event_type] || 0) + 1;
+        return acc;
+      }, {});
+      const eventsBySeverity = eventsList.reduce((acc, event) => {
+        const severity = event.severity || 'blue';
+        acc[severity] = (acc[severity] || 0) + 1;
+        return acc;
+      }, {});
+      const severityChartData = Object.keys(eventsBySeverity).map(key => ({
+        name: key === 'red' ? 'Crítico' : key === 'yellow' ? 'Atenção' : 'Informativo',
+        value: eventsBySeverity[key],
+        color: SEVERITY_COLORS[key] || '#999'
+      }));
+      const totalFeedbackGiven = eventsList.filter(event => event.feedback_status).length;
+      const totalConfirmed = eventsList.filter(event => event.feedback_status === 'true_positive').length;
+      const detectionAccuracy = totalFeedbackGiven > 0 ? (totalConfirmed / totalFeedbackGiven) * 100 : 0;
+
+      const formattedTimeSeries = timeSeriesResponse.map(point => {
+        try {
           return {
-            date: format(date, 'dd/MM', { locale: ptBR }),
-            eventos: Math.floor(Math.random() * 10) + 1,
-            alertas: Math.floor(Math.random() * 5),
+            date: format(parseISO(point.date + 'T00:00:00'), 'dd/MM', { locale: ptBR }), 
+            eventos: point.count,
+            alertas: 0
           };
-        });
+        } catch (e) {
+          return null;
+        }
+      }).filter(point => point !== null);
 
-        // Calcular taxa de precisão geral (razão entre eventos confirmados e total)
-        const totalConfirmed = eventsList.filter(event => event.feedback === true).length;
-        const detectionAccuracy = eventsList.length > 0 
-          ? (totalConfirmed / eventsList.length) * 100 
-          : 0;
-        
-        setStatistics({
-          totalCameras: cameraList.length,
-          activeCameras,
-          totalEvents: eventsList.length,
-          eventsByType,
-          recentEvents: eventsList.slice(0, 5) || [],
-          eventsByZone,
-          eventsBySeverity: severityChartData,
-          eventsTimeSeries,
-          detectionAccuracy: Math.round(detectionAccuracy)
-        });
-      } catch (err) {
-        console.error('\nErro ao buscar dados do dashboard:', err);
-        // Definir valores padrão em caso de erro
-        setStatistics(prevStats => ({
-          ...prevStats,
-          totalCameras: 0,
-          activeCameras: 0,
-          totalEvents: 0,
-          eventsByType: {},
-          recentEvents: [],
-          eventsByZone: [],
-          eventsBySeverity: [],
-          eventsTimeSeries: [],
-          detectionAccuracy: 0
-        }));
-        setEventsError('Não foi possível carregar os dados. Por favor, recarregue a página.');
-      } finally {
+      const formattedHourlyData = hourlyResponse.map(item => ({
+        name: `${String(item.hour).padStart(2, '0')}h`,
+        eventos: item.count
+      }));
+
+      setStatistics(prev => ({
+        ...prev,
+        totalCameras: cameraList.length,
+        activeCameras,
+        totalEvents: eventsList.length,
+        eventsByType,
+        eventsBySeverity: severityChartData,
+        eventsTimeSeries: formattedTimeSeries,
+        eventsByHour: formattedHourlyData,
+        detectionAccuracy: Math.round(detectionAccuracy)
+      }));
+    } catch (err) {
+      console.error('\n[DashboardPage] Erro geral em fetchDashboardData:', err);
+      setEventsError('Não foi possível carregar os dados do dashboard. Tente recarregar.');
+    } finally {
+      if (rangeOverride) {
         setIsLoading(false);
       }
-    };
-
-    fetchDashboardData();
-    
-    // Configurar atualização automática a cada 30 segundos
-    const intervalId = setInterval(() => {
-      fetchDashboardData();
-    }, 30000);
-    
-    return () => clearInterval(intervalId); // Limpar intervalo ao desmontar
-  }, []);
+    }
+  };
 
   const fetchRecentEvents = async () => {
     setIsLoadingEvents(true);
     try {
-      // Buscando os últimos 5 eventos
-      const events = await eventService.getEvents({ limit: 5 }).catch(error => {
-        console.error("Erro ao buscar eventos:", error);
-        return []; // Retornar array vazio em caso de erro
-      });
-      
-      // Garantir que sempre temos um array, mesmo se a API retornar outro tipo de dados
+      const events = await eventService.getEvents({ limit: 5 });
       const safeEvents = Array.isArray(events) ? events : [];
-      
       setStatistics(prev => ({ ...prev, recentEvents: safeEvents }));
     } catch (error) {
       console.error("Erro ao buscar eventos recentes:", error);
@@ -172,27 +151,38 @@ function DashboardPage() {
     }
   };
 
-  // Buscar eventos recentes ao carregar a página
   useEffect(() => {
-    fetchRecentEvents();
+    const intervalId = setInterval(() => {
+      fetchDashboardData();
+    }, 30000);
+    return () => clearInterval(intervalId);
   }, []);
 
-  // Configurar o callback para atualizações em tempo real
+  useEffect(() => {
+    const initialFetch = async () => {
+      setIsLoading(true);
+      await fetchDashboardData();
+      await fetchRecentEvents();
+      setIsLoading(false);
+    };
+    initialFetch();
+  }, []);
+
   useEffect(() => {
     const handleNewEvent = (eventData) => {
-      console.log("Novo evento detectado, atualizando dashboard:", eventData);
-      // Atualizar a lista de eventos recentes
+      console.log("Novo evento detectado via callback, atualizando recentes:", eventData);
       fetchRecentEvents();
     };
-    
-    // Registrar o callback no serviço de notificações
     notificationService.addEventCallback(handleNewEvent);
-    
-    // Limpar quando o componente for desmontado
     return () => {
       notificationService.removeEventCallback(handleNewEvent);
     };
   }, []);
+
+  const handleTimeRangeChange = (newRange) => {
+    setTimeRange(newRange);
+    fetchDashboardData(newRange);
+  };
 
   const formatDate = (dateString) => {
     if (!dateString) return '';
@@ -203,7 +193,6 @@ function DashboardPage() {
     }
   };
 
-  // Formatar dados para gráfico de tipos de eventos
   const getEventTypeChartData = () => {
     return Object.keys(statistics.eventsByType).map((key, index) => ({
       name: key,
@@ -212,24 +201,23 @@ function DashboardPage() {
     }));
   };
 
-  // Renderização dos filtros de tempo
   const renderTimeFilters = () => (
     <div className="mb-4 flex space-x-2">
       <button
         className={`px-3 py-1 text-sm rounded-md ${timeRange === '24h' ? 'bg-blue-600 text-white' : 'bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-300'}`}
-        onClick={() => setTimeRange('24h')}
+        onClick={() => handleTimeRangeChange('24h')}
       >
         24 horas
       </button>
       <button
         className={`px-3 py-1 text-sm rounded-md ${timeRange === '7d' ? 'bg-blue-600 text-white' : 'bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-300'}`}
-        onClick={() => setTimeRange('7d')}
+        onClick={() => handleTimeRangeChange('7d')}
       >
         7 dias
       </button>
       <button
         className={`px-3 py-1 text-sm rounded-md ${timeRange === '30d' ? 'bg-blue-600 text-white' : 'bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-300'}`}
-        onClick={() => setTimeRange('30d')}
+        onClick={() => handleTimeRangeChange('30d')}
       >
         30 dias
       </button>
@@ -238,7 +226,13 @@ function DashboardPage() {
 
   return (
     <div className="max-w-7xl mx-auto py-6 sm:px-6 lg:px-8">
-      {/* Cabeçalho agora é renderizado no MainLayout */}
+      <style global jsx>{`
+        @media (max-width: 640px) { 
+          .pie-chart-label {
+            font-size: 10px !important; 
+          }
+        }
+      `}</style>
 
       {isLoading ? (
         <div className="flex justify-center items-center py-12">
@@ -247,7 +241,6 @@ function DashboardPage() {
         </div>
       ) : (
         <div className="space-y-6">
-          {/* Filtros de navegação e tempo */}
           <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center space-y-4 sm:space-y-0">
             <div className="flex space-x-2 border-b border-gray-200 dark:border-gray-700 w-full sm:w-auto">
               <button 
@@ -262,19 +255,11 @@ function DashboardPage() {
               >
                 Eventos
               </button>
-              <button 
-                className={`px-4 py-2 font-medium ${activeTab === 'zones' ? 'text-blue-600 border-b-2 border-blue-600' : 'text-gray-500 dark:text-gray-400'}`}
-                onClick={() => setActiveTab('zones')}
-              >
-                Zonas
-              </button>
             </div>
             {renderTimeFilters()}
           </div>
 
-          {/* Cartões de Estatísticas */}
           <div className="grid grid-cols-2 gap-4 md:gap-5 lg:grid-cols-4">
-            {/* Câmeras Totais */}
             <div className="bg-white dark:bg-gray-800 overflow-hidden shadow rounded-lg">
               <div className="px-3 py-4 sm:px-4 sm:py-5">
                 <div className="flex items-center">
@@ -295,7 +280,6 @@ function DashboardPage() {
               </div>
             </div>
 
-            {/* Câmeras Ativas */}
             <div className="bg-white dark:bg-gray-800 overflow-hidden shadow rounded-lg">
               <div className="px-3 py-4 sm:px-4 sm:py-5">
                 <div className="flex items-center">
@@ -316,7 +300,6 @@ function DashboardPage() {
               </div>
             </div>
 
-            {/* Total de Eventos */}
             <div className="bg-white dark:bg-gray-800 overflow-hidden shadow rounded-lg">
               <div className="px-3 py-4 sm:px-4 sm:py-5">
                 <div className="flex items-center">
@@ -337,7 +320,6 @@ function DashboardPage() {
               </div>
             </div>
 
-            {/* Taxa de Precisão */}
             <div className="bg-white dark:bg-gray-800 overflow-hidden shadow rounded-lg">
               <div className="px-3 py-4 sm:px-4 sm:py-5">
                 <div className="flex items-center">
@@ -359,12 +341,9 @@ function DashboardPage() {
             </div>
           </div>
 
-          {/* Conteúdo baseado na aba ativa */}
           {activeTab === 'overview' && (
             <>
-              {/* Gráficos principais - Linha do tempo e distribuição */}
               <div className="grid grid-cols-1 gap-5 lg:grid-cols-2">
-                {/* Gráfico de linha de tempo */}
                 <div className="bg-white dark:bg-gray-800 shadow overflow-hidden sm:rounded-lg p-4">
                   <h3 className="text-lg leading-6 font-medium text-gray-800 dark:text-white mb-4">Eventos ao Longo do Tempo</h3>
                   <div className="h-64">
@@ -385,10 +364,9 @@ function DashboardPage() {
                   </div>
                 </div>
 
-                {/* Gráfico de distribuição por severidade */}
-                <div className="bg-white dark:bg-gray-800 shadow overflow-hidden sm:rounded-lg p-4">
+                <div className="bg-white dark:bg-gray-800 shadow overflow-hidden sm:rounded-lg p-4 flex flex-col">
                   <h3 className="text-lg leading-6 font-medium text-gray-800 dark:text-white mb-4">Distribuição por Severidade</h3>
-                  <div className="h-64 flex justify-center">
+                  <div className="h-64 flex justify-center flex-grow">
                     <ResponsiveContainer width="100%" height="100%">
                       <PieChart>
                         <Pie
@@ -403,7 +381,6 @@ function DashboardPage() {
                           fill="#8884d8"
                           dataKey="value"
                           nameKey="name"
-                          label={({ name, percent }) => `${name} ${percent ? (percent * 100).toFixed(0) : 0}%`}
                         >
                           {(statistics.eventsBySeverity && statistics.eventsBySeverity.length > 0 ? 
                             statistics.eventsBySeverity : 
@@ -413,14 +390,32 @@ function DashboardPage() {
                           ))}
                         </Pie>
                         <Tooltip contentStyle={{ backgroundColor: 'white', color: '#333' }} />
-                        <Legend formatter={(value) => <span style={{ color: '#555' }}>{value}</span>} />
+                        <Legend formatter={(value) => <span style={{ color: '#9ca3af' }}>{value}</span>} />
                       </PieChart>
                     </ResponsiveContainer>
+                  </div>
+                  <div className="mt-4 pt-4 border-t border-gray-700">
+                    <ul className="space-y-2">
+                      {(statistics.eventsBySeverity && statistics.eventsBySeverity.length > 0 ? 
+                        statistics.eventsBySeverity : 
+                        [{ name: 'Sem dados', value: 'N/A', color: '#aaa' }]
+                      ).map((entry, index) => (
+                        <li key={`severity-item-${index}`} className="flex items-center justify-between text-sm">
+                          <div className="flex items-center">
+                            <span 
+                              className="inline-block h-3 w-3 rounded-full mr-2"
+                              style={{ backgroundColor: entry.color }}
+                            ></span>
+                            <span className="text-gray-400">{entry.name}:</span>
+                          </div>
+                          <span className="font-medium text-gray-300">{entry.value}</span>
+                        </li>
+                      ))}
+                    </ul>
                   </div>
                 </div>
               </div>
 
-              {/* Eventos Recentes */}
               <div className="bg-white dark:bg-gray-800 shadow overflow-hidden sm:rounded-lg">
                 <div className="px-4 py-5 sm:px-6 border-b border-gray-200 dark:border-gray-700">
                   <h3 className="text-lg leading-6 font-medium text-gray-800 dark:text-white">Eventos Recentes</h3>
@@ -472,10 +467,8 @@ function DashboardPage() {
             </>
           )}
 
-          {/* Aba de Eventos */}
           {activeTab === 'events' && (
             <div className="grid grid-cols-1 gap-5 lg:grid-cols-2">
-              {/* Gráfico de Tipos de Eventos */}
               <div className="bg-white dark:bg-gray-800 shadow overflow-hidden sm:rounded-lg p-4">
                 <h3 className="text-lg leading-6 font-medium text-gray-800 dark:text-white mb-4">Tipos de Eventos</h3>
                 <div className="h-64 overflow-x-auto">
@@ -485,14 +478,18 @@ function DashboardPage() {
                       margin={{ top: 5, right: 30, left: 20, bottom: 5 }}
                       layout="vertical"
                     >
-                      <CartesianGrid strokeDasharray="3 3" />
-                      <XAxis type="number" />
-                      <YAxis dataKey="name" type="category" stroke="#555" />
-                      <Tooltip contentStyle={{ backgroundColor: 'white', color: '#333' }} />
-                      <Legend formatter={(value) => <span style={{ color: '#555' }}>{value}</span>} />
+                      <CartesianGrid strokeDasharray="3 3" stroke="#555"/>
+                      <XAxis type="number" stroke="#888" />
+                      <YAxis dataKey="name" type="category" stroke="#888" width={40} />
+                      <Tooltip 
+                        cursor={{fill: 'rgba(100, 100, 100, 0.1)'}} 
+                        contentStyle={{ backgroundColor: '#2d3748', border: 'none', borderRadius: '4px'}}
+                        itemStyle={{ color: '#cbd5e0' }}
+                        labelStyle={{ color: '#e2e8f0', fontWeight: 'bold' }}
+                      />
                       <Bar dataKey="value" name="Quantidade">
                         {getEventTypeChartData().map((entry, index) => (
-                          <Cell key={`cell-${index}`} fill={entry.color} />
+                          <Cell key={`cell-type-${index}`} fill={entry.color} />
                         ))}
                       </Bar>
                     </BarChart>
@@ -500,114 +497,30 @@ function DashboardPage() {
                 </div>
               </div>
 
-              {/* Gráfico de Eventos por Hora */}
               <div className="bg-white dark:bg-gray-800 shadow overflow-hidden sm:rounded-lg p-4">
                 <h3 className="text-lg leading-6 font-medium text-gray-800 dark:text-white mb-4">Distribuição por Hora do Dia</h3>
                 <div className="h-64 overflow-x-auto">
                   <ResponsiveContainer width="100%" height="100%" minWidth={300}>
                     <BarChart
-                      data={[
-                        { name: '00-04h', eventos: 5 },
-                        { name: '04-08h', eventos: 3 },
-                        { name: '08-12h', eventos: 12 },
-                        { name: '12-16h', eventos: 18 },
-                        { name: '16-20h', eventos: 22 },
-                        { name: '20-24h', eventos: 10 }
-                      ]}
+                      data={statistics.eventsByHour}
                       margin={{ top: 5, right: 30, left: 20, bottom: 5 }}
                     >
-                      <CartesianGrid strokeDasharray="3 3" />
-                      <XAxis dataKey="name" />
-                      <YAxis />
-                      <Tooltip />
-                      <Bar dataKey="eventos" name="Eventos" fill="#8884d8" />
-                    </BarChart>
-                  </ResponsiveContainer>
-                </div>
-              </div>
-            </div>
-          )}
-          
-          {/* Aba de Zonas */}
-          {activeTab === 'zones' && (
-            <div className="space-y-6">
-              {/* Eventos por Zona */}
-              <div className="bg-white dark:bg-gray-800 shadow overflow-hidden sm:rounded-lg p-4">
-                <h3 className="text-lg leading-6 font-medium text-gray-800 dark:text-white mb-4">Eventos por Zona de Detecção</h3>
-                <div className="h-64 overflow-x-auto">
-                  <ResponsiveContainer width="100%" height="100%" minWidth={300}>
-                    <BarChart
-                      data={statistics.eventsByZone && statistics.eventsByZone.length > 0 ? 
-                        statistics.eventsByZone : 
-                        [{ name: 'Sem dados', events: 0, trustedEvents: 0 }]
-                      }
-                      margin={{ top: 5, right: 30, left: 20, bottom: 5 }}
-                    >
-                      <CartesianGrid strokeDasharray="3 3" />
-                      <XAxis dataKey="name" />
-                      <YAxis />
+                      <CartesianGrid strokeDasharray="3 3" stroke="#555" />
+                      <XAxis dataKey="name" stroke="#888"/>
+                      <YAxis stroke="#888" />
                       <Tooltip 
-                        cursor={{fill: 'rgba(0, 0, 0, 0.05)'}} 
-                        contentStyle={{ backgroundColor: 'white', color: '#333' }}
+                        cursor={{fill: 'rgba(100, 100, 100, 0.1)'}} 
+                        contentStyle={{ backgroundColor: '#2d3748', border: 'none', borderRadius: '4px'}}
+                        itemStyle={{ color: '#cbd5e0' }}
+                        labelStyle={{ color: '#e2e8f0', fontWeight: 'bold' }}
                       />
-                      <Legend formatter={(value) => <span style={{ color: '#555' }}>{value}</span>} />
-                      <Bar dataKey="events" name="Total de Eventos" fill="#8884d8" />
-                      <Bar dataKey="trustedEvents" name="Eventos Confirmados" fill="#82ca9d" />
+                      <Bar dataKey="eventos" name="Eventos">
+                        {(statistics.eventsByHour || []).map((entry, index) => (
+                          <Cell key={`cell-hour-${index}`} fill={COLORS[index % COLORS.length]} />
+                        ))}
+                      </Bar>
                     </BarChart>
                   </ResponsiveContainer>
-                </div>
-              </div>
-
-              {/* Tabela de Zonas */}
-              <div className="bg-white dark:bg-gray-800 shadow overflow-hidden sm:rounded-lg">
-                <div className="px-4 py-5 sm:px-6 border-b border-gray-200 dark:border-gray-700">
-                  <h3 className="text-lg leading-6 font-medium text-gray-800 dark:text-white">Detalhes por Zona</h3>
-                </div>
-                <div className="overflow-x-auto">
-                  <table className="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
-                    <thead className="bg-gray-50 dark:bg-gray-700">
-                      <tr>
-                        <th scope="col" className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
-                          Zona
-                        </th>
-                        <th scope="col" className="px-3 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
-                          Total
-                        </th>
-                        <th scope="col" className="px-3 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
-                          Confirmados
-                        </th>
-                        <th scope="col" className="px-3 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
-                          Precisão
-                        </th>
-                        <th scope="col" className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
-                          Tipo Comum
-                        </th>
-                      </tr>
-                    </thead>
-                    <tbody className="bg-white dark:bg-gray-800 divide-y divide-gray-200 dark:divide-gray-700">
-                      {(statistics.eventsByZone || []).map((zone) => (
-                        <tr key={zone.name} className="hover:bg-gray-50 dark:hover:bg-gray-700">
-                          <td className="px-4 py-3 whitespace-nowrap text-sm font-medium text-gray-900 dark:text-white">
-                            {zone.name}
-                          </td>
-                          <td className="px-3 py-3 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">
-                            {zone.events}
-                          </td>
-                          <td className="px-3 py-3 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">
-                            {zone.trustedEvents}
-                          </td>
-                          <td className="px-3 py-3 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">
-                            {Math.round((zone.trustedEvents / zone.events) * 100)}%
-                          </td>
-                          <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">
-                            {zone.name === 'Entrada Principal' ? 'Pessoa' : 
-                              zone.name === 'Estacionamento' ? 'Veículo' : 
-                              zone.name === 'Perímetro' ? 'Movimento' : 'Pessoa'}
-                          </td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
                 </div>
               </div>
             </div>

@@ -4,6 +4,8 @@ import { useAuth } from '../contexts/AuthContext';
 import { TypeAnimation } from 'react-type-animation';
 import Lottie from 'lottie-react';
 import cameraAnimation from '../assets/lottie/splash-animation.json';
+import mainSceneAnimation from '../assets/lottie/main-scene.json';
+import { Squares2X2Icon } from '@heroicons/react/24/outline';
 
 
 function LandingPage() {
@@ -80,7 +82,7 @@ function LandingPage() {
             <div className="flex items-center">
               <button
                 onClick={handleAccessClick}
-                className="bg-blue-700 hover:bg-blue-600 text-white py-2 px-4 rounded-md text-sm font-medium"
+                className="bg-slate-700/60 hover:bg-blue-600 text-white py-2 px-4 rounded-md text-sm font-medium"
               >
                 {isAuthenticated ? 'Acessar Dashboard' : 'Acessar Sistema'}
               </button>
@@ -105,10 +107,10 @@ function LandingPage() {
           <p className="mt-6 text-xl text-blue-100 max-w-3xl">
             O sistema de monitoramento inteligente Detec-o utiliza inteligência artificial avançada para detectar comportamentos suspeitos e garantir a segurança em tempo real.
           </p>
-          <div className="mt-10">
+          <div className="mt-10 mb-8">
             <a
               href="#contato"
-              className="inline-block bg-white py-3 px-8 border border-transparent rounded-md text-base font-medium text-blue-900 hover:bg-blue-50"
+              className="inline-block bg-white py-3 px-8 border border-transparent rounded-md text-base font-medium text-blue-900 hover:bg-blue-50 mb-8"
             >
               Solicitar Demonstração
             </a>
@@ -160,6 +162,7 @@ function LandingPage() {
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="lg:text-center">
             <h2 className="text-base text-blue-600 font-semibold tracking-wide uppercase">Sobre Nós</h2>
+            <hr className="my-4 border-t border-gray-300/50 shadow-[0_0_6px_rgba(255,255,255,0.5)]" />
             <p className="mt-2 text-3xl leading-8 font-extrabold tracking-tight text-gray-900 sm:text-4xl">
               Soluções inteligentes para segurança moderna
             </p>
@@ -183,6 +186,7 @@ function LandingPage() {
                 <h3 className="text-2xl font-extrabold text-gray-900">
                   Nossa missão
                 </h3>
+                <hr className="my-4 border-t border-gray-300/50 shadow-[0_0_6px_rgba(255,255,255,0.5)]" />
                 <p className="mt-3 text-lg text-gray-600">
                 </p>
                 <p className="mt-3 text-lg text-gray-600">
@@ -196,6 +200,8 @@ function LandingPage() {
           </div>
         </div>
       </div>
+
+      
 
       {/* Serviços Section */}
       <div id="servicos" className="py-16 bg-gray-50">
@@ -222,6 +228,7 @@ function LandingPage() {
                       </svg>
                     </div>
                     <h3 className="mt-4 text-xl font-semibold text-gray-900">Monitoramento Inteligente</h3>
+                    <hr className="my-4 border-t border-gray-300/50 shadow-[0_0_6px_rgba(255,255,255,0.5)]" />
                     <p className="mt-3 text-base text-gray-600">
                       Detectamos automaticamente comportamentos suspeitos, como agressões, uso de armas e situações de perigo, enviando alertas em tempo real.
                     </p>
@@ -239,6 +246,7 @@ function LandingPage() {
                       </svg>
                     </div>
                     <h3 className="mt-4 text-xl font-semibold text-gray-900">Controle de Acesso</h3>
+                    <hr className="my-4 border-t border-gray-300/50 shadow-[0_0_6px_rgba(255,255,255,0.5)]" />
                     <p className="mt-3 text-base text-gray-600">
                       Identificação e controle de acesso de pessoas, com registro automático de entrada e saída, tempo de permanência e detecção de áreas restritas.
                     </p>
@@ -256,6 +264,7 @@ function LandingPage() {
                       </svg>
                     </div>
                     <h3 className="mt-4 text-xl font-semibold text-gray-900">Análise e Relatórios</h3>
+                    <hr className="my-4 border-t border-gray-300/50 shadow-[0_0_6px_rgba(255,255,255,0.5)]" />
                     <p className="mt-3 text-base text-gray-600">
                       Dashboard analítico com estatísticas de ocorrências, relatórios personalizados e análise de tendências para tomada de decisão.
                     </p>
@@ -267,23 +276,198 @@ function LandingPage() {
         </div>
       </div>
 
+        {/* Nova Seção – Casos de Uso */}
+        <div id="use-cases" className="relative py-16 overflow-hidden">
+          {/* camada de fundo com blur */}
+          <div
+            className="absolute inset-0 bg-fixed bg-center bg-cover filter"
+            style={{ backgroundImage: "url('/images/bgs/video-bg.png')" }}
+          />
+          <div className="relative max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 text-center">
+            {/* título e descrição */}
+            <div className="mb-8 inline-flex items-center bg-slate-800/80 px-4 py-2 rounded-full mx-auto">
+              <Squares2X2Icon className="h-6 w-6 text-white mr-2" />
+              <h2 className="text-base text-white font-semibold tracking-wide uppercase m-0">
+                Potencializando casos de uso
+              </h2>
+            </div>
+            <div>
+              <p className="mt-2 text-3xl leading-8 font-extrabold tracking-tight text-[#f4f4f4] md:py-8 sm:text-4xl md:text-4xl text-xl">Confira uma visão geral do que você pode realizar com a ferramenta de anotação de vídeo Detec-o.</p>
+            </div>
+            <div className="mt-10 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-2 gap-8">
+              {/* Card 1 */}
+              <div className="flex flex-col bg-slate-900/50 backdrop-blur-md rounded-lg shadow-xl overflow-hidden">
+                <div className="p-4">
+                  <div className="aspect-video rounded-lg overflow-hidden border border-gray-700">
+                    <video
+                      src="/videos/lane-detection.mp4"
+                      loop
+                      muted
+                      autoPlay
+                      playsInline
+                      controls={false}
+                      className="w-full h-full object-cover"
+                    />
+                  </div>
+                </div>
+                <div className="p-4 text-left">
+                  <h3 className="mt-0 text-xl font-semibold text-white">Detecção de faixas</h3>
+                  <hr className="my-4 border-t border-gray-300/50 shadow-[0_0_6px_rgba(255,255,255,0.5)]" />
+                  <p className="mt-2 text-gray-300">
+                  Identifique e acompanhe as faixas de uma rua ou rodovia em vídeos.
+                  </p>
+                </div>
+              </div>
+
+              {/* Card 2 */}
+              <div className="flex flex-col bg-slate-900/50 backdrop-blur-md rounded-lg shadow-xl overflow-hidden">
+                <div className="p-4">
+                  <div className="aspect-video rounded-lg overflow-hidden border border-gray-700">
+                    <video
+                      src="/videos/action-detection.mp4"
+                      loop
+                      muted
+                      autoPlay
+                      playsInline
+                      controls={false}
+                      className="w-full h-full object-cover"
+                    />
+                  </div>
+                </div>
+                <div className="p-4 text-left">
+                  <h3 className="mt-0 text-xl font-semibold text-white">
+                  Detecção de ações
+                  </h3>
+                  <hr className="my-4 border-t border-gray-300/50 shadow-[0_0_6px_rgba(255,255,255,0.5)]" />
+                  <p className="mt-2 text-gray-300">
+                  Reconheça e detecte ações ou atividades que devem serem monitoradas com formato dinâmico.
+                  </p>
+                 </div>
+              </div>
+
+              {/* Card 3 */}
+              <div className="flex flex-col bg-slate-900/50 backdrop-blur-md rounded-lg shadow-xl overflow-hidden">
+                <div className="p-4">
+                  <div className="aspect-video rounded-lg overflow-hidden border border-gray-700">
+                    <video
+                      src="/videos/pose-estimation.mp4"
+                      loop
+                      muted
+                      autoPlay
+                      playsInline
+                      controls={false}
+                      className="w-full h-full object-cover"
+                    />
+                  </div>
+                </div>
+                <div className="p-4 text-left">
+                  <h3 className="mt-0 text-xl font-semibold text-white">
+                  Estimativa de pose
+                  </h3>
+                  <hr className="my-4 border-t border-gray-300/50 shadow-[0_0_6px_rgba(255,255,255,0.5)]" />
+                  <p className="mt-2 text-gray-300">
+                  Determine a posição e a orientação das articulações e partes do corpo.
+                  </p>
+                </div>
+              </div>
+              
+              {/* Card 4 */}
+              <div className="flex flex-col bg-slate-900/50 backdrop-blur-md rounded-lg shadow-xl overflow-hidden">
+                <div className="p-4">
+                  <div className="aspect-video rounded-lg overflow-hidden border border-gray-700">
+                    <video
+                      src="/videos/classification.mp4"
+                      loop
+                      muted
+                      autoPlay
+                      playsInline
+                      controls={false}
+                      className="w-full h-full object-cover"
+                    />
+                  </div>
+                </div>
+                <div className="p-4 text-left">
+                  <h3 className="mt-0 text-xl font-semibold text-white">
+                    Classificação
+                  </h3>
+                  <hr className="my-4 border-t border-gray-300/50 shadow-[0_0_6px_rgba(255,255,255,0.5)]" />
+                  <p className="mt-2 text-gray-300">
+                  Categorize seus vídeos atribuindo classes com base em "shapes", ditando seu conteúdo e características.
+                  </p>
+                </div>
+              </div>
+
+              {/* Card 5 */}
+              <div className="flex flex-col bg-slate-900/50 backdrop-blur-md rounded-lg shadow-xl overflow-hidden">
+                <div className="p-4">
+                  <div className="aspect-video rounded-lg overflow-hidden border border-gray-700">
+                    <video
+                      src="/videos/instance-segmentation.mp4"
+                      loop
+                      muted
+                      autoPlay
+                      playsInline
+                      controls={false}
+                      className="w-full h-full object-cover"
+                    />
+                  </div>
+                </div>
+                <div className="p-4 text-left">
+                  <h3 className="mt-0 text-xl font-semibold text-white">
+                  Segmentação e rastreamento de instâncias
+                  </h3>
+                  <hr className="my-4 border-t border-gray-300/50 shadow-[0_0_6px_rgba(255,255,255,0.5)]" />
+                  <p className="mt-2 text-gray-300">
+                  Identifique instâncias e acompanhe seus movimentos ao longo de uma sequência de vídeo.
+                  </p>
+                </div>
+              </div>
+
+              <div className="flex flex-col bg-slate-900/50 backdrop-blur-md rounded-lg shadow-xl overflow-hidden">
+                <div className="p-4">
+                  <div className="aspect-video rounded-lg overflow-hidden border border-gray-700">
+                    <video
+                      src="/videos/object-tracking.mp4"
+                      loop
+                      muted
+                      autoPlay
+                      playsInline
+                      controls={false}
+                      className="w-full h-full object-cover"
+                    />
+                  </div>
+                </div>
+                <div className="p-4 text-left">
+                  <h3 className="mt-0 text-xl font-semibold text-white">
+                  Rastreamento e localização de objetos
+                  </h3>
+                  <hr className="my-4 border-t border-gray-300/50 shadow-[0_0_6px_rgba(255,255,255,0.5)]" />
+                  <p className="mt-2 text-gray-300">
+                  Detecte e acompanhe o movimento e a localização de objetos em quadros consecutivos de vídeos utilizando caixas delimitadoras (bounding boxes).
+                  </p>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
       {/* Tecnologia Section */}
       <div id="tecnologia" className="py-16 bg-white">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="lg:text-center">
-            <h2 className="text-base text-blue-600 font-semibold tracking-wide uppercase">Nossa Tecnologia</h2>
-            <p className="mt-2 text-3xl leading-8 font-extrabold tracking-tight text-gray-900 sm:text-4xl">
+            <h2 className="text-base py-8 text-blue-600 font-semibold tracking-wide uppercase">Nossa Tecnologia</h2>
+            <p className="mt-6 mb-2 text-3xl leading-8 font-extrabold tracking-tight text-gray-900 sm:text-4xl">
               Inteligência artificial a serviço da segurança
             </p>
-            <p className="mt-4 max-w-2xl text-xl text-gray-600 lg:mx-auto">
+            <p className="mt-4 max-w-2xl text-xl text-gray-600 lg:mx-auto py-8">
               Utilizamos algoritmos avançados para garantir detecções precisas e relevantes.
             </p>
           </div>
 
-          <div className="mt-16">
+          <div className="py-16">
             <div className="lg:grid lg:grid-cols-3 lg:gap-8">
               {/* Tecnologia 1 */}
-              <div>
+              <div className="rounded-lg shadow-lg overflow-hidden p-6">
                 <div className="flex items-center justify-center h-12 w-12 rounded-md bg-blue-700 text-white">
                   <svg className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M7 8h10M7 12h4m1 8l-4-4H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-3l-4 4z" />
@@ -291,6 +475,7 @@ function LandingPage() {
                 </div>
                 <div className="mt-5">
                   <h3 className="text-lg font-medium text-gray-900">Alertas em Tempo Real</h3>
+                  <hr className="my-4 border-t border-gray-300/50 shadow-[0_0_6px_rgba(255,255,255,0.5)]" />
                   <p className="mt-2 text-base text-gray-600">
                     Receba notificações imediatas quando eventos relevantes são detectados, permitindo resposta rápida.
                   </p>
@@ -298,7 +483,7 @@ function LandingPage() {
               </div>
 
               {/* Tecnologia 2 */}
-              <div className="mt-10 lg:mt-0">
+              <div className="mt-10 lg:mt-0 rounded-lg shadow-lg overflow-hidden p-6">
                 <div className="flex items-center justify-center h-12 w-12 rounded-md bg-blue-700 text-white">
                   <svg className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M3 10h18M7 15h1m4 0h1m-7 4h12a3 3 0 003-3V8a3 3 0 00-3-3H6a3 3 0 00-3 3v8a3 3 0 003 3z" />
@@ -306,6 +491,7 @@ function LandingPage() {
                 </div>
                 <div className="mt-5">
                   <h3 className="text-lg font-medium text-gray-900">Categorização por Cores</h3>
+                  <hr className="my-4 border-t border-gray-300/50 shadow-[0_0_6px_rgba(255,255,255,0.5)]" />
                   <p className="mt-2 text-base text-gray-600">
                     Eventos são categorizados por cores para indicar diferentes níveis de atenção: vermelho (perigo), amarelo (suspeito) e azul (informativo).
                   </p>
@@ -313,7 +499,7 @@ function LandingPage() {
               </div>
 
               {/* Tecnologia 3 */}
-              <div className="mt-10 lg:mt-0">
+              <div className="mt-10 lg:mt-0 rounded-lg shadow-lg overflow-hidden p-6">
                 <div className="flex items-center justify-center h-12 w-12 rounded-md bg-blue-700 text-white">
                   <svg className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M13 10V3L4 14h7v7l9-11h-7z" />
@@ -321,6 +507,7 @@ function LandingPage() {
                 </div>
                 <div className="mt-5">
                   <h3 className="text-lg font-medium text-gray-900">Sistema de Feedback</h3>
+                  <hr className="my-4 border-t border-gray-300/50 shadow-[0_0_6px_rgba(255,255,255,0.5)]" />
                   <p className="mt-2 text-base text-gray-600">
                     Confirme ou corrija detecções para melhorar continuamente a precisão do sistema através de machine learning.
                   </p>
@@ -363,8 +550,8 @@ function LandingPage() {
                   // Aplicando estilos de card mobile corretamente
                   <a key={`col1-${index}`} href={item.href} className="bg-white rounded-lg shadow-md overflow-hidden block mb-4 w-full md:w-3/4 md:mx-auto">
                     <img src={item.src} loading="lazy" alt={item.alt} className="w-full h-40 md:h-56 object-cover" />
-                    <div className="p-3 text-center">
-                       <span className="text-gray-800 font-medium text-base">{item.title}</span>
+                    <div className="p-3 text-center bg-slate-800">
+                       <span className="text-gray-50 font-medium text-base">{item.title}</span>
                     </div>
                   </a>
                 ))}
@@ -381,7 +568,7 @@ function LandingPage() {
               </p>
               <a
                 href="#contato" // Link para a seção de contato ou outra página
-                className="self-center md:self-start bg-blue-700 hover:bg-blue-600 text-white py-3 px-8 rounded-md text-base font-medium"
+                className="self-center md:self-start bg-slate-800 hover:bg-blue-600 text-white py-3 px-8 rounded-md text-base font-medium mb-8"
               >
                 Solicitar Demonstração
               </a>
@@ -414,8 +601,8 @@ function LandingPage() {
                    // Aplicando estilos de card mobile corretamente
                   <a key={`col2-${index}`} href={item.href} className="bg-white rounded-lg shadow-md overflow-hidden block mb-4 w-full md:w-3/4 md:mx-auto">
                     <img src={item.src} loading="lazy" alt={item.alt} className="w-full h-40 md:h-56 object-cover" />
-                    <div className="p-3 text-center">
-                      <span className="text-gray-800 font-medium text-base">{item.title}</span>
+                    <div className="p-3 text-center bg-slate-800">
+                      <span className="text-gray-50 font-medium text-base">{item.title}</span>
                     </div>
                   </a>
                  ))}
@@ -454,12 +641,14 @@ function LandingPage() {
         `}</style>
       </div>
 
+    
+
       {/* Integração com Equipamentos Existentes */}
       <div id="integracao" className="py-16 bg-gray-50">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="lg:text-center">
             <h2 className="text-base text-blue-600 font-semibold tracking-wide uppercase">Integração Universal</h2>
-            <p className="mt-2 text-3xl leading-8 font-extrabold tracking-tight text-gray-900 sm:text-4xl">
+            <p className="py-4 text-3xl leading-8 font-extrabold tracking-tight text-gray-900 sm:text-4xl">
               Use com o equipamento que você já possui
             </p>
             <p className="mt-4 max-w-2xl text-xl text-gray-600 lg:mx-auto">
@@ -470,16 +659,18 @@ function LandingPage() {
           <div className="mt-16">
             <div className="lg:grid lg:grid-cols-2 lg:gap-8 lg:items-center">
               <div className="mt-10 lg:mt-0 order-first lg:order-last">
-                <img 
-                  src="/images/integration.jpg" 
-                  alt="Diagrama de integração" 
-                  className="mx-auto rounded-lg shadow-lg"
+                <Lottie 
+                  animationData={mainSceneAnimation} 
+                  loop={true}
+                  autoplay={true}
+                  className="mx-auto w-40 h-40 sm:w-62 sm:h-62 md:w-96 md:h-96"
                 />
               </div>
               <div>
-                <h3 className="text-2xl font-extrabold text-gray-900">
+                <h3 className="text-2xl my-6 font-extrabold text-gray-900">
                   Compatibilidade ampla para economia real
                 </h3>
+                <hr className="my-4 border-t border-gray-300/50 shadow-[0_0_6px_rgba(255,255,255,0.5)]" />
                 <div className="mt-6">
                   <div className="flex">
                     <div className="flex-shrink-0">
@@ -530,8 +721,8 @@ function LandingPage() {
               </div>
             </div>
             
-            <div className="mt-16">
-              <h3 className="text-xl font-bold text-center text-gray-900 mb-8">Compatível com os principais fabricantes</h3>
+            <div className="py-40">
+              <h3 className="text-2xl pb-8 font-bold text-center text-gray-900 mb-8">Compatível com os principais fabricantes</h3>
               <div className="grid grid-cols-2 gap-8 md:grid-cols-6">
                 <div className="col-span-1 flex justify-center">
                   <img className="h-8 sm-12 md:h-12" src="/images/hikvisioon.png" alt="Hikvision" />
@@ -560,54 +751,99 @@ function LandingPage() {
 
       {/* Galeria / Casos de Uso */}
       <div className="bg-gray-100 py-16">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="lg:text-center">
+        <div className="mx-auto px-0">
+          <div className="text-center max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
             <h2 className="text-base text-blue-600 font-semibold tracking-wide uppercase">Galeria</h2>
             <p className="mt-2 text-3xl leading-8 font-extrabold tracking-tight text-gray-900 sm:text-4xl">
               Casos de Uso
             </p>
-            <p className="mt-4 max-w-2xl text-xl text-gray-600 lg:mx-auto">
+            <p className="mt-4 max-w-2xl text-xl text-gray-600 mx-auto">
               Conheça como o sistema Detec-o está sendo utilizado em diferentes cenários.
             </p>
           </div>
 
-          <div className="mt-16 grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-3">
-            {/* As imagens foram adicionadas pelo cliente */}
-            <div className="relative h-64 rounded-lg overflow-hidden">
-              <img src="/images/caso1.webp" alt="Caso 1" className="absolute inset-0 w-full h-full object-cover" />
-              <p className="absolute bottom-0 left-0 bg-black top text-white bg-opacity-50 p-2">Prevenção de furtos</p>
-            </div>
-            <div className="relative h-64 rounded-lg overflow-hidden">
-              <img src="/images/caso7.webp" alt="Caso" className="absolute inset-0 w-full h-full object-cover" />
-              <p className="absolute bottom-0 left-0 bg-black text-white bg-opacity-50 p-2">Prevenção de atentados</p>
-            </div>
-            <div className="relative h-64 rounded-lg overflow-hidden">
-              <img src="/images/caso7.jpg" alt="Caso 2" className="absolute inset-0 w-full h-full object-cover" />
-              <p className="absolute bottom-0 left-0 bg-black text-white bg-opacity-50 p-2">Prevenção de afogamentos</p>
-            </div>
-            <div className="relative h-64 rounded-lg overflow-hidden">
-              <img src="/images/caso2.webp" alt="Caso 3" className="absolute inset-0 w-full h-full object-cover" />
-              <p className="absolute bottom-0 left-0 bg-black text-white bg-opacity-50 p-2">Notifação de encomendas</p>
-            </div>
-            <div className="relative h-64 rounded-lg overflow-hidden">
-              <img src="/images/caso3.webp" alt="Caso 4" className="absolute inset-0 w-full h-full object-cover" />
-              <p className="absolute bottom-0 left-0 bg-black text-white bg-opacity-50 p-2">Identificação de itens perdidos</p>
-            </div>
-            <div className="relative h-64 rounded-lg overflow-hidden">
-              <img src="/images/caso4.webp" alt="Caso 5" className="absolute inset-0 w-full h-full object-cover" />
-              <p className="absolute bottom-0 left-0 bg-black text-white bg-opacity-50 p-2">Monitoramento comportamental</p>
-            </div>
-            <div className="relative h-64 rounded-lg overflow-hidden">
-              <img src="/images/caso5.webp" alt="Caso 6" className="absolute inset-0 w-full h-full object-cover" />
-              <p className="absolute bottom-0 left-0 bg-black text-white bg-opacity-50 p-2">Vigilancias em aeroportos</p>
-            </div>
-            <div className="relative h-64 rounded-lg overflow-hidden">
-              <img src="/images/caso6.webp" alt="Caso 7" className="absolute inset-0 w-full h-full object-cover" />
-              <p className="absolute bottom-0 left-0 bg-black text-white bg-opacity-50 p-2">Identificação de buracos</p>
+          <div className="mt-16 relative overflow-hidden w-full">
+            <div 
+              className="flex hover:pause-animation"
+              style={{
+                animation: 'carousel 60s linear infinite',
+                width: 'fit-content',
+                animationTimingFunction: 'linear'
+              }}
+            >
+              {/* Primeiro conjunto de imagens */}
+              <div className="relative h-64 sm:h-72 md:h-80 lg:h-96 w-80 sm:w-96 md:w-[30rem] lg:w-[34rem] flex-shrink-0 mx-3">
+                <img src="/images/caso1.webp" alt="Caso 1" className="w-full h-full object-cover rounded-lg" />
+                <p className="absolute bottom-0 left-0 bg-black text-white bg-opacity-50 p-2 rounded-bl-lg">Prevenção de furtos</p>
+              </div>
+              <div className="relative h-64 sm:h-72 md:h-80 lg:h-96 w-80 sm:w-96 md:w-[30rem] lg:w-[34rem] flex-shrink-0 mx-3">
+                <img src="/images/caso7.webp" alt="Caso" className="w-full h-full object-cover rounded-lg" />
+                <p className="absolute bottom-0 left-0 bg-black text-white bg-opacity-50 p-2 rounded-bl-lg">Prevenção de atentados</p>
+              </div>
+              <div className="relative h-64 sm:h-72 md:h-80 lg:h-96 w-80 sm:w-96 md:w-[30rem] lg:w-[34rem] flex-shrink-0 mx-3">
+                <img src="/images/caso7.jpg" alt="Caso 2" className="w-full h-full object-cover rounded-lg" />
+                <p className="absolute bottom-0 left-0 bg-black text-white bg-opacity-50 p-2 rounded-bl-lg">Prevenção de afogamentos</p>
+              </div>
+              <div className="relative h-64 sm:h-72 md:h-80 lg:h-96 w-80 sm:w-96 md:w-[30rem] lg:w-[34rem] flex-shrink-0 mx-3">
+                <img src="/images/caso2.webp" alt="Caso 3" className="w-full h-full object-cover rounded-lg" />
+                <p className="absolute bottom-0 left-0 bg-black text-white bg-opacity-50 p-2 rounded-bl-lg">Notifação de encomendas</p>
+              </div>
+              <div className="relative h-64 sm:h-72 md:h-80 lg:h-96 w-80 sm:w-96 md:w-[30rem] lg:w-[34rem] flex-shrink-0 mx-3">
+                <img src="/images/caso3.webp" alt="Caso 4" className="w-full h-full object-cover rounded-lg" />
+                <p className="absolute bottom-0 left-0 bg-black text-white bg-opacity-50 p-2 rounded-bl-lg">Identificação de itens perdidos</p>
+              </div>
+              <div className="relative h-64 sm:h-72 md:h-80 lg:h-96 w-80 sm:w-96 md:w-[30rem] lg:w-[34rem] flex-shrink-0 mx-3">
+                <img src="/images/caso4.webp" alt="Caso 5" className="w-full h-full object-cover rounded-lg" />
+                <p className="absolute bottom-0 left-0 bg-black text-white bg-opacity-50 p-2 rounded-bl-lg">Monitoramento comportamental</p>
+              </div>
+              <div className="relative h-64 sm:h-72 md:h-80 lg:h-96 w-80 sm:w-96 md:w-[30rem] lg:w-[34rem] flex-shrink-0 mx-3">
+                <img src="/images/caso5.webp" alt="Caso 6" className="w-full h-full object-cover rounded-lg" />
+                <p className="absolute bottom-0 left-0 bg-black text-white bg-opacity-50 p-2 rounded-bl-lg">Vigilancias em aeroportos</p>
+              </div>
+              <div className="relative h-64 sm:h-72 md:h-80 lg:h-96 w-80 sm:w-96 md:w-[30rem] lg:w-[34rem] flex-shrink-0 mx-3">
+                <img src="/images/caso6.webp" alt="Caso 7" className="w-full h-full object-cover rounded-lg" />
+                <p className="absolute bottom-0 left-0 bg-black text-white bg-opacity-50 p-2 rounded-bl-lg">Identificação de buracos</p>
+              </div>
+              
+              {/* Duplicação das imagens para efeito de carrossel infinito */}
+              <div className="relative h-64 sm:h-72 md:h-80 lg:h-96 w-80 sm:w-96 md:w-[30rem] lg:w-[34rem] flex-shrink-0 mx-3">
+                <img src="/images/caso1.webp" alt="Caso 1" className="w-full h-full object-cover rounded-lg" />
+                <p className="absolute bottom-0 left-0 bg-black text-white bg-opacity-50 p-2 rounded-bl-lg">Prevenção de furtos</p>
+              </div>
+              <div className="relative h-64 sm:h-72 md:h-80 lg:h-96 w-80 sm:w-96 md:w-[30rem] lg:w-[34rem] flex-shrink-0 mx-3">
+                <img src="/images/caso7.webp" alt="Caso" className="w-full h-full object-cover rounded-lg" />
+                <p className="absolute bottom-0 left-0 bg-black text-white bg-opacity-50 p-2 rounded-bl-lg">Prevenção de atentados</p>
+              </div>
+              <div className="relative h-64 sm:h-72 md:h-80 lg:h-96 w-80 sm:w-96 md:w-[30rem] lg:w-[34rem] flex-shrink-0 mx-3">
+                <img src="/images/caso7.jpg" alt="Caso 2" className="w-full h-full object-cover rounded-lg" />
+                <p className="absolute bottom-0 left-0 bg-black text-white bg-opacity-50 p-2 rounded-bl-lg">Prevenção de afogamentos</p>
+              </div>
+              <div className="relative h-64 sm:h-72 md:h-80 lg:h-96 w-80 sm:w-96 md:w-[30rem] lg:w-[34rem] flex-shrink-0 mx-3">
+                <img src="/images/caso2.webp" alt="Caso 3" className="w-full h-full object-cover rounded-lg" />
+                <p className="absolute bottom-0 left-0 bg-black text-white bg-opacity-50 p-2 rounded-bl-lg">Notifação de encomendas</p>
+              </div>
+              <div className="relative h-64 sm:h-72 md:h-80 lg:h-96 w-80 sm:w-96 md:w-[30rem] lg:w-[34rem] flex-shrink-0 mx-3">
+                <img src="/images/caso3.webp" alt="Caso 4" className="w-full h-full object-cover rounded-lg" />
+                <p className="absolute bottom-0 left-0 bg-black text-white bg-opacity-50 p-2 rounded-bl-lg">Identificação de itens perdidos</p>
+              </div>
             </div>
           </div>
         </div>
       </div>
+      
+      <style jsx>{`
+        @keyframes carousel {
+          0% {
+            transform: translateX(0);
+          }
+          100% {
+            transform: translateX(-50%);
+          }
+        }
+        .hover\:pause-animation:hover {
+          animation-play-state: paused;
+        }
+      `}</style>
 
       {/* Contato/CTA Section */}
       <div id="contato" className="bg-blue-700">

@@ -92,7 +92,7 @@ const AIModelSelector = ({ cameraId, onSave }) => {
     } else {
       processedValue = value;
     }
-
+    
     setCurrentSettings(prev => ({
       ...prev,
       [name]: processedValue

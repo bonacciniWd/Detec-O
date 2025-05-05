@@ -18,28 +18,48 @@ const FeedbackControl = ({ eventId, initialValue = null, onFeedbackSubmit = null
   const containerClass = size === "small" ? "flex space-x-1" : "flex space-x-2";
 
   // Enviar feedback
-  const submitFeedback = async (isPositive) => {
+  const submitFeedback = async (feedbackValue) => {
     try {
       setIsSubmitting(true);
+
+      // Mapear valor do botão para o status esperado pela API
+      let statusToSend;
+      if (feedbackValue === true) {
+        statusToSend = 'true_positive';
+      } else if (feedbackValue === false) {
+        statusToSend = 'false_positive';
+      } else { // Assume 'uncertain'
+        statusToSend = 'uncertain';
+      }
       
-      // Enviar para a API
-      await apiClient.post(`/v1/events/${eventId}/feedback`, {
-        is_positive: isPositive,
-        notes: notes
+      // Enviar para a API com os nomes corretos
+      await apiClient.post(`/api/events/${eventId}/feedback`, {
+        feedback_status: statusToSend,
+        feedback_notes: notes
       });
       
       // Atualizar estado e notificar
-      setFeedbackSubmitted(true);
-      setIsPositive(isPositive);
-      toast.success(`Feedback ${isPositive ? 'positivo' : 'negativo'} enviado com sucesso!`);
+      setFeedback(statusToSend);
+      setIsPositive(feedbackValue === true);
+      toast.success(`Feedback '${statusToSend}' enviado com sucesso!`);
       
       // Notificar componente pai
       if (onFeedbackSubmit) {
-        onFeedbackSubmit(isPositive, notes);
+        onFeedbackSubmit(statusToSend, notes);
       }
     } catch (error) {
       console.error('Erro ao enviar feedback:', error);
-      toast.error('Não foi possível enviar o feedback. Tente novamente.');
+      // Exibir detalhes do erro de validação se disponíveis
+      const errorDetail = error.response?.data?.detail;
+      let errorMessage = 'Não foi possível enviar o feedback.';
+      if (typeof errorDetail === 'string') {
+        errorMessage += ` Detalhe: ${errorDetail}`;
+      } else if (Array.isArray(errorDetail)) {
+        // Formatar erros de validação Pydantic
+        const validationErrors = errorDetail.map(err => `${err.loc.join('.')} - ${err.msg}`).join(', ');
+        errorMessage += ` Erros: ${validationErrors}`;
+      }
+      toast.error(errorMessage);
     } finally {
       setIsSubmitting(false);
     }

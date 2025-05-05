@@ -131,7 +131,7 @@ const AddCameraPage = () => {
                 placeholder="Ex: Câmera Corredor Interno"
               />
             </div>
-
+            
             <div>
               <label className="block text-gray-700 text-sm font-medium mb-2" htmlFor="ipAddress">
                 Endereço IP Local *
@@ -163,7 +163,7 @@ const AddCameraPage = () => {
                 placeholder="Ex: 554"
               />
             </div>
-
+            
             <div>
               <label className="block text-gray-700 text-sm font-medium mb-2" htmlFor="rtspPath">
                 Caminho RTSP *
@@ -186,7 +186,7 @@ const AddCameraPage = () => {
                 onClick={() => setShowAdvanced(!showAdvanced)}
                 className="'text-blue-600 text-slate-900 text-sm flex items-center focus:outline-none hover:underline"
               >
-                 {showAdvanced ? (
+                {showAdvanced ? (
                   <svg className="h-4 w-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M5 15l7-7 7 7"></path></svg>
                 ) : (
                   <svg className="h-4 w-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 9l-7 7-7-7"></path></svg>

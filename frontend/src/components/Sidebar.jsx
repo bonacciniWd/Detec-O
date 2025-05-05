@@ -10,7 +10,7 @@ const Sidebar = () => {
     { path: '/dashboard', icon: <FaHome />, text: 'Dashboard' },
     { path: '/cameras', icon: <FaVideo />, text: 'Câmeras' },
     { path: '/events', icon: <FaBell />, text: 'Eventos' },
-    { path: '/people', icon: <FaUser />, text: 'Pessoas' },
+    { path: '/pessoas', icon: <FaUser />, text: 'Pessoas' },
     { path: '/settings', icon: <FaCog />, text: 'Configurações' },
   ];
   

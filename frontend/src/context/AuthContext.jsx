@@ -57,7 +57,7 @@ export const AuthProvider = ({ children }) => {
 
   // Função de login usando o serviço de API
   const login = async (email, password) => {
-    setIsLoading(true);
+      setIsLoading(true);
     setError(null);
     try {
       // 1. Fazer login e obter o token

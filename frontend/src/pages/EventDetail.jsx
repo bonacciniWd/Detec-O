@@ -12,6 +12,11 @@ const EventDetail = () => {
   const [error, setError] = useState(null);
   const [event, setEvent] = useState(null);
 
+  // Estados específicos para o vídeo
+  const [videoUrl, setVideoUrl] = useState(null);
+  const [videoLoading, setVideoLoading] = useState(false);
+  const [videoError, setVideoError] = useState(null);
+
   useEffect(() => {
     const fetchEventDetails = async () => {
       try {
@@ -35,6 +40,52 @@ const EventDetail = () => {
       setLoading(false);
     }
   }, [id, token]);
+
+  // Efeito para buscar o vídeo quando o evento for carregado
+  useEffect(() => {
+    // Só busca o vídeo se tivermos o ID do evento e o token
+    if (id && token) {
+      setVideoLoading(true);
+      setVideoError(null);
+      setVideoUrl(null); // Limpa URL anterior
+      let currentVideoUrl = null; // Variável para guardar a URL e revogar na limpeza
+
+      const fetchVideo = async () => {
+        try {
+          console.log('Token usado para buscar vídeo:', token);
+          const response = await axios.get(`/api/events/${id}/video`, {
+            headers: { Authorization: `Bearer ${token}` },
+            responseType: 'blob', // Essencial para receber dados binários
+          });
+
+          const blob = new Blob([response.data], { type: 'video/mp4' });
+          currentVideoUrl = URL.createObjectURL(blob);
+          setVideoUrl(currentVideoUrl);
+
+        } catch (err) {
+          console.error('Error fetching video:', err);
+          if (err.response && err.response.status === 404) {
+            setVideoError('Vídeo não encontrado para este evento.');
+          } else {
+            setVideoError('Não foi possível carregar o vídeo.');
+          }
+          setVideoUrl(null); // Garantir que não haja URL antiga em caso de erro
+        } finally {
+          setVideoLoading(false);
+        }
+      };
+
+      fetchVideo();
+
+      // Função de limpeza para revogar a Object URL
+      return () => {
+        if (currentVideoUrl) {
+          console.log("Revogando Object URL:", currentVideoUrl); // Log para debug
+          URL.revokeObjectURL(currentVideoUrl);
+        }
+      };
+    }
+  }, [id, token]); // Depende de id e token
 
   const handleDelete = async () => {
     if (window.confirm('Tem certeza que deseja excluir este evento?')) {
@@ -120,18 +171,23 @@ const EventDetail = () => {
             <h2 className="text-lg font-semibold mb-3 text-gray-900 dark:text-white">
               Detalhes do Evento
             </h2>
-            <div className="bg-gray-100 dark:bg-gray-700 p-4 rounded-lg">
+            <div className="bg-gray-100 dark:bg-gray-700 p-4 rounded-lg text-sm text-gray-800 dark:text-gray-200">
               <p className="mb-2">
-                <span className="font-semibold">Tipo:</span> {event.type || 'Não especificado'}
+                <span className="font-semibold">Tipo:</span> {event.event_type || 'Não especificado'}
               </p>
               <p className="mb-2">
                 <span className="font-semibold">Câmera:</span> {event.camera_name || event.camera_id || 'Desconhecida'}
               </p>
+              {event.detected_person_name && (
+                <p className="mb-2">
+                  <span className="font-semibold">Pessoa Detectada:</span> {event.detected_person_name}
+                </p>
+              )}
               <p className="mb-2">
                 <span className="font-semibold">Zona:</span> {event.zone || 'Não especificada'}
               </p>
               <p className="mb-2">
-                <span className="font-semibold">Confiança:</span> {event.confidence ? `${event.confidence}%` : 'Não disponível'}
+                <span className="font-semibold">Confiança:</span> {event.confidence ? `${(event.confidence * 100).toFixed(1)}%` : 'Não disponível'}
               </p>
               <p>
                 <span className="font-semibold">Status:</span> {' '}
@@ -150,21 +206,38 @@ const EventDetail = () => {
           
           <div>
             <h2 className="text-lg font-semibold mb-3 text-gray-900 dark:text-white">
-              Imagem Capturada
+              Vídeo do Evento
             </h2>
-            <div className="bg-gray-100 dark:bg-gray-700 p-4 rounded-lg flex items-center justify-center">
-              {event.image_url ? (
-                <img 
-                  src={event.image_url} 
-                  alt="Imagem do evento" 
+            <div className="bg-gray-100 dark:bg-gray-700 p-4 rounded-lg flex items-center justify-center min-h-[200px]">
+              {videoLoading && (
+                <div className="text-center py-10">
+                  <div className="loader-small mx-auto mb-2"></div> {/* Usar classe de loader se houver */} 
+                  <p className="text-gray-500 dark:text-gray-400">Carregando vídeo...</p>
+                </div>
+              )}
+              {videoError && !videoLoading && (
+                <div className="text-red-500 dark:text-red-400 text-center py-10">
+                  <svg xmlns="http://www.w3.org/2000/svg" className="h-12 w-12 mx-auto mb-2 opacity-75" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                  </svg>
+                  <p>{videoError}</p>
+                </div>
+              )}
+              {videoUrl && !videoLoading && !videoError && (
+                <video 
+                  controls
+                  src={videoUrl} 
                   className="max-w-full max-h-64 rounded"
-                />
-              ) : (
+                >
+                  Seu navegador não suporta o elemento de vídeo.
+                </video>
+              )}
+              {!videoLoading && !videoError && !videoUrl && (
                 <div className="text-gray-500 dark:text-gray-400 text-center py-10">
                   <svg xmlns="http://www.w3.org/2000/svg" className="h-16 w-16 mx-auto mb-2 opacity-50" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 10l4.553-2.276A1 1 0 0121 8.618v6.764a1 1 0 01-1.447.894L15 14M4 18h11a1 1 0 001-1V7a1 1 0 00-1-1H4a1 1 0 00-1 1v10a1 1 0 001 1z" />
                   </svg>
-                  <p>Nenhuma imagem disponível</p>
+                  <p>Vídeo indisponível ou carregando...</p>
                 </div>
               )}
             </div>
@@ -210,6 +283,27 @@ const EventDetail = () => {
               {event.status === 'pending' ? 'Confirmar' : 
                event.status === 'confirmed' ? 'Marcar como Falso' : 'Restaurar Pendência'}
             </button>
+
+            {/* Botão de Download - agora usa videoUrl */}
+            <a
+              href={videoUrl} // Usa a URL do blob
+              download={`evento_${event?.id || id}.mp4`} // Nome do arquivo sugerido
+              target="_blank"
+              rel="noopener noreferrer"
+              // Desabilita o botão/link se não houver URL
+              className={`inline-flex items-center px-4 py-2 rounded-md text-sm font-medium 
+                ${videoUrl ? 
+                  'bg-green-600 text-white hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-green-500' : 
+                  'bg-gray-500 text-gray-300 cursor-not-allowed'}
+              `}
+              // Impede o clique se não houver URL
+              onClick={(e) => !videoUrl && e.preventDefault()}
+            >
+              <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
+              </svg>
+              Baixar Vídeo
+            </a>
           </div>
         </div>
       </div>

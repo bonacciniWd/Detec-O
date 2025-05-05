@@ -95,7 +95,7 @@ const eventService = {
       throw error; // Re-lança o erro para ser tratado no componente
     }
   },
-  
+
   /**
    * Obtém detalhes de um evento específico
    * @param {string} eventId - ID do evento
@@ -177,6 +177,39 @@ const eventService = {
       return response.data;
     } catch (error) {
       console.error('Erro ao buscar estatísticas de eventos:', error);
+      throw error;
+    }
+  },
+
+  /**
+   * Obtém dados da série temporal de eventos por dia.
+   * @param {Object} params - Parâmetros como start_date, end_date, camera_id
+   * @returns {Promise<Array<{date: string, count: number}>>} - Lista de pontos da série temporal
+   */
+  getEventTimeSeries: async (params) => {
+    try {
+      // console.log("[eventService] Buscando série temporal com params:", params);
+      const response = await api.get('/api/events/stats/timeseries', { params });
+      // console.log("[eventService] Resposta da API para timeseries:", response.data);
+      return Array.isArray(response.data) ? response.data : [];
+    } catch (error) {
+      console.error("[eventService] Erro ao buscar série temporal:", error.response?.data || error.message);
+      throw error;
+    }
+  },
+
+  /**
+   * Obtém a distribuição de eventos por hora do dia.
+   * @param {Object} params - Parâmetros como start_date, end_date, camera_id
+   * @returns {Promise<Array<{hour: number, count: number}>>} - Lista de contagens por hora
+   */
+  getEventHourlyDistribution: async (params) => {
+    try {
+      console.log("[eventService] Buscando distribuição horária com params:", params);
+      const response = await api.get('/api/events/stats/hourly', { params });
+      return Array.isArray(response.data) ? response.data : [];
+    } catch (error) {
+      console.error("[eventService] Erro ao buscar distribuição horária:", error.response?.data || error.message);
       throw error;
     }
   }

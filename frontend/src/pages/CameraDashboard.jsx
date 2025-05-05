@@ -250,7 +250,8 @@ const CameraDashboard = () => {
               <div className="w-full bg-gray-700 flex items-center justify-center text-gray-400 aspect-video"> {/* Aspect ratio */}
                 <LiveSnapshotImage 
                   cameraId={device.id}
-                  interval={refreshInterval}
+                  isCameraActive={device.detection_enabled}
+                      interval={refreshInterval}
                   className="w-full h-full"
                 />
               </div>
@@ -284,20 +285,20 @@ const CameraDashboard = () => {
                         (currentStatus.is_running ? <FaStop size={12}/> : <FaPlay size={12}/>)
                       }
                     </button>
-                    <button 
-                      onClick={() => handleEditCamera(device.id)}
+                      <button 
+                        onClick={() => handleEditCamera(device.id)}
                       className="p-1.5 bg-gray-700 text-gray-300 rounded hover:bg-gray-600"
                       title="Editar Configurações"
-                    >
-                      <FaPen size={12} />
-                    </button>
-                    <button 
-                      onClick={() => handleDeleteCamera(device.id, device.name)}
+                      >
+                        <FaPen size={12} />
+                      </button>
+                      <button 
+                        onClick={() => handleDeleteCamera(device.id, device.name)}
                       className="p-1.5 bg-gray-700 text-gray-300 rounded hover:bg-gray-600"
                       title="Excluir Câmera"
-                    >
-                      <FaTrash size={12} />
-                    </button>
+                      >
+                        <FaTrash size={12} />
+                      </button>
                   </div>
                 </div>
                 {/* IP/Porta */} 
@@ -305,7 +306,7 @@ const CameraDashboard = () => {
                 {/* Exibir último erro se houver e não estiver rodando */}
                 {!currentStatus.is_running && currentStatus.last_error && (
                     <p className="text-xs text-red-400 mt-1 truncate" title={currentStatus.last_error}>Erro: {currentStatus.last_error}</p>
-                )}
+              )}
               </div>
 
             </div>
