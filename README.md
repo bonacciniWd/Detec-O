@@ -7,9 +7,10 @@ Sistema completo para monitoramento de câmeras e detecção de eventos utilizan
 O Detec-O é um sistema de monitoramento de câmeras com detecção de objetos e eventos em tempo real. O sistema permite:
 
 - Conectar a diferentes câmeras IP via RTSP
-- Detectar pessoas, veículos e outros objetos de interesse (Funcionalidade futura)
+- Detectar objetos de interesse (veículos, animais, etc.)
+- **Cadastrar pessoas e reconhecê-las nos vídeos (Reconhecimento Facial)**
 - Configurar zonas de detecção específicas em cada câmera (Funcionalidade futura)
-- Visualizar eventos detectados com informações e snapshots
+- Visualizar eventos detectados com informações e snapshots (incluindo a pessoa reconhecida, se aplicável)
 - Fornecer feedback sobre eventos detectados (Funcionalidade futura)
 
 ## Tecnologias Utilizadas
@@ -208,6 +209,35 @@ O FastAPI, por padrão, trata URLs com e sem barra final (`/`) de forma específ
 
 Verifique sempre a definição da rota no backend ao implementar novas chamadas no frontend.
 
+## Gerenciamento de Pessoas e Reconhecimento Facial (NOVO)
+
+Esta funcionalidade permite cadastrar indivíduos no sistema para que possam ser reconhecidos automaticamente durante o processamento dos vídeos das câmeras.
+
+### Cadastro
+- A interface frontend na rota `/pessoas` permite listar, adicionar, editar e remover pessoas.
+- Ao adicionar ou editar uma pessoa, é possível definir:
+    - Nome
+    - Descrição (opcional)
+    - Categoria (Padrão, Aluno, Funcionário, Visitante, VIP, Acesso Restrito)
+    - Classe/Turma (campo adicional exibido apenas se a categoria for "Aluno")
+- O cadastro inicial de uma pessoa requer uma imagem facial.
+- É possível adicionar múltiplas imagens faciais para a mesma pessoa (através do botão "Adicionar Face" no card da pessoa).
+- O sistema oferece duas formas de fornecer a imagem facial:
+    - **Upload de Arquivo:** Selecionar uma foto do dispositivo.
+    - **Captura por Webcam:** Um modal dedicado é aberto, exibindo a pré-visualização da câmera com uma moldura oval guia para ajudar no enquadramento do rosto.
+- Um modal instrutivo com animação Lottie e dicas de captura é exibido na primeira vez que o usuário acessa a página `/pessoas`.
+
+### Backend e Processamento
+- Novas rotas foram adicionadas em `/api/persons/` para gerenciar o CRUD de pessoas e em `/api/persons/{id}/faces` para adicionar faces.
+- Novos modelos SQLAlchemy (`Person`, `FaceEmbedding`) e tabelas correspondentes (`persons`, `face_embeddings`) foram criados no banco de dados PostgreSQL.
+- Ao cadastrar uma pessoa ou adicionar uma face:
+    - A imagem (recebida em base64) é processada no backend.
+    - A biblioteca `face_recognition` é utilizada para detectar o rosto e extrair seu *embedding* (representação vetorial).
+    - O embedding é armazenado na tabela `face_embeddings` associado à pessoa.
+    - Uma imagem de *thumbnail* do rosto detectado é gerada e salva em `api/snapshots/thumbnails/persons/`.
+- O modelo `DetectionEvent` foi atualizado com a coluna `detected_person_id` para vincular um evento de detecção a uma pessoa reconhecida.
+- (Lógica futura: Durante o processamento do vídeo, os rostos detectados terão seus embeddings comparados com os do banco de dados para realizar o reconhecimento e preencher `detected_person_id` nos eventos.)
+
 ## Estado Atual das Funcionalidades (Data da Última Atualização)
 
 *   **Adição/Listagem de Câmeras:** Funcional, com validação RTSP local.
@@ -219,23 +249,155 @@ Verifique sempre a definição da rota no backend ao implementar novas chamadas 
     *   **Salva eventos de detecção relevantes (`detection_events`) no banco.**
     *   **Salva snapshots (`.jpg`) das detecções na pasta `api/snapshots/` e associa o caminho ao evento.**
 *   **Controle de Processamento:** APIs para iniciar/parar o processamento por câmera estão funcionais.
+*   **Gerenciamento de Pessoas:**
+    *   **Interface `/pessoas` funcional para CRUD de pessoas e adição de faces.**
+    *   **Cadastro via upload de arquivo ou captura por webcam (com modal dedicado e guia oval).**
+    *   **Backend armazena dados da pessoa, embeddings faciais (via `face_recognition`) e thumbnails.**
+    *   **Exclusão de pessoa remove também o arquivo thumbnail associado.**
+    *   (Reconhecimento em tempo real e vinculação a eventos ainda precisam ser implementados no loop de processamento da câmera).
 
 ## Próximos Passos Atuais
 
-1.  **Visualização de Eventos:**
-    *   Implementar API `GET /api/events/` no backend para buscar eventos salvos.
-    *   Implementar API no backend para servir arquivos estáticos da pasta `api/snapshots/`.
-    *   Atualizar `EventsPage.jsx` (frontend) para buscar e exibir a lista de eventos e seus snapshots.
-2.  **Processamento de Vídeo e IA (Refinamento):**
-    *   Otimizar loop de processamento (ex: `asyncio`?).
-    *   Analisar bounding box para exibição/outras lógicas.
-    *   Refinar tratamento de erros.
-3.  **Outros:**
+
     *   Implementar atualização completa das Configurações Gerais (`handleSubmit` em `CameraSettings.jsx`).
     *   Documentar port forwarding/DDNS.
     *   Segurança (HTTPS, etc.).
     *   Implementar Live View opcional.
 
+## Dependências Externas
+
+*   **FFmpeg:** Necessário para a funcionalidade de geração de vídeo a partir de snapshots de eventos. O backend espera que o comando `ffmpeg` esteja instalado e acessível no PATH do sistema onde a API está rodando.
+
+## Problemas Conhecidos e Melhorias Futuras
+
+*   **Visualização de Vídeo de Eventos (Erro 401):**
+    *   **Problema:** Atualmente, ao tentar visualizar o vídeo de um evento (no modal da página de eventos), ocorre um erro 401 Unauthorized. Isso acontece porque a tag `<video>` não envia o token de autenticação necessário para acessar o endpoint `/api/events/{event_id}/video`.
+    *   **Solução Proposta:** Modificar o componente frontend para buscar o vídeo usando `fetch` ou `axios` (incluindo o cabeçalho `Authorization`), receber a resposta como `blob`, gerar uma `URL.createObjectURL()` e usar essa URL temporária como `src` da tag `<video>`.
+*   **Refatoração da Exibição de Detalhes do Evento:**
+    *   **Problema:** A lógica detalhada de exibição de um evento (incluindo o vídeo) está atualmente implementada dentro de um modal na página `EventsPage.jsx`, tornando o componente extenso. A página dedicada `EventDetail.jsx` não está sendo utilizada para este fim.
+    *   **Melhoria Proposta:** Refatorar a aplicação para que o botão "Ver Detalhes" na `EventsPage.jsx` navegue para a rota `/events/:id`, utilizando a página `EventDetail.jsx` para exibir todas as informações do evento, incluindo o vídeo (com a correção do erro 401 aplicada nesta página).
+
 ## Licença
 
 [MIT](LICENSE) 
+
+### Notas Importantes
+
+#### Endpoint de Snapshot da Câmera (`GET /api/cameras/{camera_id}/snapshot`)
+
+*   Obter snapshots ao vivo de streams RTSP pode ser lento e propenso a falhas (câmera offline, URL incorreta, etc.), o que pode bloquear o servidor.
+*   Para garantir a responsividade da API, este endpoint **retorna uma imagem placeholder** (`api/assets/logo.png`) por padrão.
+*   Para solicitar uma tentativa de obter um snapshot *real* e atualizado, adicione o parâmetro de consulta `?force=true` à URL (`GET /api/cameras/{camera_id}/snapshot?force=true`).
+*   **Atenção:** Mesmo com `force=true`, a API tentará conectar à câmera algumas vezes com timeouts curtos. A requisição pode levar alguns segundos e ainda pode retornar o placeholder ou um código de erro (503, 504) se a câmera não responder às tentativas. Use `force=true` com moderação, preferencialmente em resposta a ações explícitas do usuário.
+*   Certifique-se de que a imagem placeholder exista em `api/assets/logo.png`.
+
+## Guia de Atualização do Frontend na VPS
+
+### Procedimento padrão de atualização
+
+1. **Acesse a VPS via SSH:**
+   ```
+   ssh denisbonaccini@srv778922
+   ```
+
+2. **Navegue até o repositório e atualize o código:**
+   ```
+   cd ~/Detec-O
+   git stash         # Caso haja alterações locais
+   git pull origin main
+   ```
+
+3. **Compile o frontend:**
+   ```
+   cd frontend
+   npm install       # Atualiza dependências
+   npm run build     # Gera arquivos para produção
+   ```
+
+4. **Copie os arquivos para o diretório servido pelo NGINX:**
+   ```
+   sudo cp -r dist/* /var/www/detec-o/
+   sudo chown -R www-data:www-data /var/www/detec-o
+   ```
+
+5. **Reinicie o NGINX:**
+   ```
+   sudo service nginx restart
+   ```
+
+### Solução de problemas comuns
+
+#### Erro 500 Internal Server Error
+
+Se ocorrer um erro 500 após a atualização:
+
+1. **Verifique a sintaxe da configuração NGINX:**
+   ```
+   sudo nginx -t
+   ```
+
+2. **Verifique os logs de erro:**
+   ```
+   sudo tail -n 100 /var/log/nginx/error.log
+   ```
+
+3. **Restaure para uma versão básica funcionando:**
+   ```
+   sudo bash -c 'echo "<html><body>Teste básico</body></html>" > /var/www/detec-o/index.html'
+   sudo service nginx restart
+   ```
+
+4. **Corrija a configuração NGINX se necessário:**
+   ```
+   sudo nano /etc/nginx/sites-available/default
+   ```
+
+   Configuração básica funcional:
+   ```
+   server {
+       listen 80;
+       server_name detec-o.com.br;
+       return 301 https://$host$request_uri;
+   }
+
+   server {
+       listen 443 ssl;
+       server_name detec-o.com.br;
+
+       ssl_certificate /etc/letsencrypt/live/detec-o.com.br/fullchain.pem;
+       ssl_certificate_key /etc/letsencrypt/live/detec-o.com.br/privkey.pem;
+
+       root /var/www/detec-o;
+       index index.html;
+
+       location / {
+           try_files $uri $uri/ /index.html;
+           add_header Cache-Control "no-store, no-cache, must-revalidate";
+       }
+
+       location /api/ {
+           proxy_pass http://127.0.0.1:8080/api/v1/;
+           proxy_set_header Host $host;
+           proxy_set_header X-Real-IP $remote_addr;
+       }
+   }
+   ```
+
+#### Problemas com dependências do Node.js
+
+Se ocorrerem erros relacionados a dependências durante o build:
+
+1. **Limpe a instalação e reinstale:**
+   ```
+   rm -rf node_modules
+   rm package-lock.json
+   npm install
+   ```
+
+2. **Certifique-se de usar a versão correta do Node.js:**
+   ```
+   node -v  # Verifique a versão
+   # Use nvm se precisar alternar versões
+   ```
+
+

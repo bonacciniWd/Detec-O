@@ -3,7 +3,7 @@ Modelos Pydantic para validação e serialização
 """
 from typing import List, Optional, Dict, Any
 from pydantic import BaseModel, EmailStr, Field, validator
-from datetime import datetime
+from datetime import datetime, date, time
 
 # ---- Schemas para Usuários ----
 
@@ -150,15 +150,35 @@ class DetectionEventBase(BaseModel):
 class DetectionEventCreate(DetectionEventBase):
     """Modelo para criação de eventos de detecção"""
     camera_id: str
+    detected_person_id: Optional[str] = None # Adicionar ID da pessoa opcionalmente na criação
+
+class EventFeedbackCreate(BaseModel):
+    """Schema para criar/atualizar feedback de um evento."""
+    feedback_status: str # 'true_positive', 'false_positive', 'uncertain'
+    feedback_notes: Optional[str] = None
+
+    @validator('feedback_status')
+    def feedback_status_must_be_valid(cls, v):
+        if v not in ['true_positive', 'false_positive', 'uncertain']:
+            raise ValueError('feedback_status must be one of: true_positive, false_positive, uncertain')
+        return v
 
 class DetectionEventResponse(DetectionEventBase):
     """Modelo para resposta de eventos de detecção"""
     id: str
     camera_id: str
     timestamp: datetime
+    detected_person_id: Optional[str] = None
+    detected_person_name: Optional[str] = None # Novo campo para o nome
+    # Adicionar campos de feedback se quiser retorná-los
+    feedback_status: Optional[str] = None
+    feedback_notes: Optional[str] = None
+    feedback_user_id: Optional[str] = None
+    feedback_timestamp: Optional[datetime] = None
     
     class Config:
-        from_attributes = True 
+        from_attributes = True
+        # Adicionar validação ou lógica específica se necessário
 
 # ---- Schemas para Configurações de IA ----
 
@@ -191,3 +211,110 @@ class ProcessorStatus(BaseModel):
     rtsp_url: Optional[str] = None
     last_error: Optional[str] = None
     # Adicionar outros campos se get_status() retornar mais infos 
+
+# ---- Schemas para Configurações Gerais do Usuário ----
+
+class UserSettingsNotifications(BaseModel):
+    email: bool = False
+    browser: bool = True
+    mobile: bool = False
+    frequency: str = 'immediate'
+
+class UserSettingsDetection(BaseModel):
+    confidenceThreshold: float = Field(default=0.6, ge=0.1, le=1.0)
+    minDetectionInterval: int = Field(default=30, ge=1)
+    motionSensitivity: int = Field(default=5, ge=1, le=10)
+    enableWeaponDetection: bool = True
+    enableFaceDetection: bool = True
+    enableBehaviorAnalysis: bool = True
+
+class UserSettingsInterface(BaseModel):
+    darkMode: bool = False
+    compactView: bool = False
+    showStatistics: bool = True
+    highlightDetections: bool = True
+
+class UserSettingsBase(BaseModel):
+    notifications: UserSettingsNotifications = UserSettingsNotifications()
+    detection: UserSettingsDetection = UserSettingsDetection()
+    interface: UserSettingsInterface = UserSettingsInterface()
+
+class UserSettingsUpdate(UserSettingsBase):
+    # Como é PUT, esperamos todos os campos, então não precisamos de Optional aqui.
+    # Se fosse PATCH, usaríamos Optional em cada campo e nos sub-modelos.
+    pass 
+
+class UserSettingsResponse(UserSettingsBase):
+    user_id: str # Associar as configurações ao usuário
+
+    class Config:
+        from_attributes = True 
+
+# ---- Schemas para Estatísticas ----
+
+class EventTimeSeriesPoint(BaseModel):
+    """Representa um ponto na série temporal de contagem de eventos."""
+    date: date # Ou str, dependendo de como o backend formatar
+    count: int
+
+# (Opcional, se quiser encapsular a lista)
+# class EventTimeSeriesResponse(BaseModel):
+#     timeseries: List[EventTimeSeriesPoint]
+
+class EventHourlyCount(BaseModel):
+    """Contagem de eventos para uma determinada hora."""
+    hour: int # 0-23
+    count: int
+
+# ---- Novos Schemas para Pessoas e Faces ----
+
+class PersonBase(BaseModel):
+    """Schema base para pessoas"""
+    name: str
+    description: Optional[str] = None
+    category: Optional[str] = 'default'
+    class_group: Optional[str] = None
+
+class PersonCreate(PersonBase):
+    """Schema para criar uma nova pessoa (recebe imagem base64)."""
+    face_image: str = Field(..., description="Imagem facial inicial em formato base64.")
+
+class PersonUpdate(PersonBase):
+    """Schema para atualizar dados de uma pessoa (sem imagem)."""
+    name: Optional[str] = None
+    description: Optional[str] = None
+    category: Optional[str] = None
+    class_group: Optional[str] = None
+
+class PersonResponse(PersonBase):
+    """Schema para retornar dados de uma pessoa."""
+    id: str
+    thumbnail_url: Optional[str] = None
+    face_count: int = 0
+    created_at: datetime
+    updated_at: datetime
+
+    class Config:
+        from_attributes = True
+
+# Schemas para Embeddings Faciais
+
+class FaceEmbeddingBase(BaseModel):
+    """Schema base para embeddings faciais."""
+    person_id: str
+    label: Optional[str] = None
+
+class FaceEmbeddingCreate(FaceEmbeddingBase):
+    """Schema para adicionar uma nova face (recebe imagem base64)."""
+    face_image: str = Field(..., description="Nova imagem facial em formato base64.")
+
+class FaceEmbeddingResponse(FaceEmbeddingBase):
+    """Schema para retornar dados de um embedding (não retorna o embedding binário)."""
+    id: str
+    source_image_path: Optional[str] = None
+    created_at: datetime
+
+    class Config:
+        from_attributes = True
+
+# ... (Restante dos schemas, se houver) ... 

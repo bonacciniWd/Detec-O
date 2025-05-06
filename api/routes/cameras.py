@@ -30,35 +30,26 @@ async def get_cameras(
     current_user: models.User = Depends(security.get_current_user)
 ):
     """
-    Obtém a lista de câmeras do usuário atual, incluindo o path do último snapshot de evento.
-    Converte objetos SQLAlchemy em dicts para evitar erros de serialização.
+    Obtém a lista de câmeras do usuário atual.
     """
     # Buscar câmeras do usuário atual
     cameras_db = db.query(models.Camera).filter(
         models.Camera.owner_id == current_user.id
     ).offset(skip).limit(limit).all()
     
-    # WORKAROUND: Converter e Adicionar Último Snapshot
+    # Converter para dicionários (sem buscar último snapshot)
     cameras_list = []
     for camera in cameras_db:
-        # Converter camera base para dict
         camera_dict = {
             field: getattr(camera, field) 
             for field in schemas.CameraResponse.__fields__ 
-            if hasattr(camera, field) and field != 'last_event_image_path' # Excluir o campo que vamos adicionar
+            if hasattr(camera, field) # Obter todos os campos definidos no schema/modelo
         }
         
-        # Buscar o último evento com imagem para esta câmera
-        last_event_with_image = db.query(models.DetectionEvent).filter(
-            models.DetectionEvent.camera_id == camera.id,
-            models.DetectionEvent.image_path != None # Garantir que tem imagem
-        ).order_by(
-            desc(models.DetectionEvent.timestamp) # Ordenar por mais recente
-        ).first()
-        
-        # Adicionar o path ao dicionário
-        camera_dict['last_event_image_path'] = last_event_with_image.image_path if last_event_with_image else None
-        
+        # Garantir que o campo last_event_image_path (se ainda esperado pelo schema) seja None
+        if 'last_event_image_path' not in camera_dict:
+             camera_dict['last_event_image_path'] = None
+             
         cameras_list.append(camera_dict)
         
     return cameras_list
@@ -233,12 +224,12 @@ async def delete_camera(
     
     return None 
 
-# --- NOVA ROTA PARA SNAPSHOT --- 
+# --- ROTA PARA SNAPSHOT MODIFICADA --- 
 @router.get(
     "/{camera_id}/snapshot", 
     tags=["cameras"], 
-    summary="Obter Snapshot da Câmera",
-    description="Retorna um frame JPEG atual da câmera especificada.",
+    summary="Obter Snapshot da Câmera (Opcional)",
+    description="Retorna um frame JPEG atual da câmera apenas se force=true for passado, senão retorna placeholder.",
     responses={
         200: {"content": {"image/jpeg": {}}, "description": "Snapshot da câmera em formato JPEG"},
         400: {"description": "URL RTSP não configurada"},
@@ -252,50 +243,51 @@ async def delete_camera(
 )
 async def get_camera_snapshot(
     camera_id: str,
+    force: bool = False, # Novo parâmetro de consulta, default False
     db: Session = Depends(get_db),
     current_user: models.User = Depends(security.get_current_user)
 ):
     """
     Obtém um snapshot (frame JPEG atual) de uma câmera específica.
+    Apenas tenta conectar à câmera se force=True.
     """
-    # 1. Buscar câmera no banco
+    
+    # 1. Buscar câmera no banco (ainda necessário para permissão e fallback)
     db_camera = db.query(models.Camera).filter(models.Camera.id == camera_id).first()
     if not db_camera:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND, 
-            detail="Câmera não encontrada"
-        )
-        
-    # 2. Verificar permissão
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Câmera não encontrada")
     if db_camera.owner_id != current_user.id:
-         raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN, 
-            detail="Acesso não autorizado a esta câmera"
-        )
-        
-    # 3. Verificar serviço
-    if video_service is None:
-        raise HTTPException(
-            status_code=status.HTTP_501_NOT_IMPLEMENTED, 
-            detail="Serviço de vídeo não está disponível."
-        )
+         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Acesso não autorizado")
 
-    # 4. Chamar o serviço
-    try:
-        image_bytes = video_service.get_camera_snapshot_bytes(db=db, camera_id=camera_id)
-        
-        # 5. Retornar a resposta
-        return Response(content=image_bytes, media_type="image/jpeg") 
-        
-    except HTTPException as http_exc: 
-        raise http_exc # Repassa exceções formatadas
-    except Exception as e:
-        error_detail = f"Erro interno inesperado ao obter snapshot: {str(e)}"
-        print(f"Erro inesperado no endpoint de snapshot para câmera {camera_id}: {error_detail}")
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=error_detail
-        ) 
+    # 2. Verificar se deve forçar a busca do snapshot real
+    if force:
+        print(f"[API Snapshot] Forçando busca de snapshot real para câmera {camera_id}")
+        # Chamar a função do video_service que tem a lógica de retry/placeholder
+        if video_service is None:
+            raise HTTPException(status_code=status.HTTP_501_NOT_IMPLEMENTED, detail="Serviço de vídeo não disponível.")
+        try:
+            image_bytes = video_service.get_camera_snapshot_bytes(db=db, camera_id=camera_id)
+            # A função get_camera_snapshot_bytes já retorna placeholder em caso de falha
+            return Response(content=image_bytes, media_type="image/jpeg")
+        except HTTPException as http_exc:
+            # Se get_camera_snapshot_bytes levantar erro (ex: placeholder indisponível), repassar
+            raise http_exc
+        except Exception as e:
+            # Capturar outros erros inesperados ao chamar o serviço
+            error_detail = f"Erro interno inesperado ao chamar serviço de snapshot: {str(e)}"
+            print(f"Erro inesperado no endpoint de snapshot (force=true) para câmera {camera_id}: {error_detail}")
+            raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=error_detail)
+    else:
+        # 3. Se não forçar, retornar placeholder diretamente
+        print(f"[API Snapshot] Retornando placeholder para câmera {camera_id} (force=false)")
+        if video_service and hasattr(video_service, 'placeholder_image_bytes') and video_service.placeholder_image_bytes:
+            return Response(content=video_service.placeholder_image_bytes, media_type="image/jpeg")
+        else:
+            # Se placeholder não carregou no video_service
+            raise HTTPException(
+                status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+                detail="Snapshot não forçado e imagem placeholder não está disponível."
+            )
 
 # --- ROTAS PARA CONFIGURAÇÕES DE DETECÇÃO --- 
 

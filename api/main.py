@@ -27,7 +27,7 @@ origins = [
     "http://localhost:5173",  # Frontend Vite
     "http://localhost:3000",  # Frontend React alternativo
     "http://localhost:5000",  # Frontend de produção
-    "https://detec-o.com",    # Domínio de produção
+    "https://detec-o.com.br",    # Domínio de produção
 ]
 
 app.add_middleware(
